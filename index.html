@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoH Procurement Transparency dApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #dbe3ef;
+      --primary: #166534;
+      --primary-2: #15803d;
+      --accent: #0f766e;
+      --danger: #b91c1c;
+      --warning: #b45309;
+      --shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #166534, #0f766e);
+      color: white;
+      padding: 24px;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+    }
+
+    .hero p {
+      margin: 0;
+      opacity: 0.95;
+      line-height: 1.5;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2, .card h3 {
+      margin-top: 0;
+      margin-bottom: 12px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .triple {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin: 10px 0 6px;
+      font-size: 0.95rem;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      outline: none;
+      background: #fff;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    textarea {
+      min-height: 88px;
+      resize: vertical;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease;
+      margin-top: 12px;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-secondary { background: #e8f5ec; color: var(--primary); }
+    .btn-accent { background: var(--accent); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-warning { background: var(--warning); color: white; }
+
+    .pill {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #eef6ff;
+      color: #1d4ed8;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .stat {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .stat-title {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 1rem;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .log {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 16px;
+      padding: 16px;
+      min-height: 180px;
+      max-height: 320px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .footer-note {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .full { grid-column: 1 / -1; }
+
+    @media (max-width: 980px) {
+      .toolbar, .grid, .triple, .actions, .status-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>MoH Procurement Transparency dApp</h1>
+      <p>
+        A simple mobile-friendly frontend for the Ministry of Health procurement smart contract.
+        Use this with MetaMask on Sepolia. Replace the contract address before deployment.
+      </p>
+    </section>
+
+    <section class="toolbar">
+      <div class="card">
+        <h2>Connection</h2>
+        <p class="muted">Connect MetaMask, then the app will read and write to the deployed contract.</p>
+        <button class="btn-primary" id="connectBtn">Connect Wallet</button>
+        <div style="margin-top:12px;"></div>
+        <div><strong>Connected wallet:</strong> <span id="walletAddress">Not connected</span></div>
+        <div><strong>Network:</strong> <span id="networkName">Unknown</span></div>
+      </div>
+
+      <div class="card">
+        <h2>Contract</h2>
+        <div><strong>Address:</strong></div>
+        <div class="muted" id="contractAddressText" style="margin-top:6px; word-break:break-all;"></div>
+        <div style="margin-top:12px;"><span class="pill">Sepolia Only</span></div>
+      </div>
+
+      <div class="card">
+        <h2>Quick Refresh</h2>
+        <p class="muted">Use this after each transaction to update the current on-chain state.</p>
+        <button class="btn-secondary" id="refreshBtn">Refresh Contract State</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Live Contract State</h2>
+      <div class="status-grid">
+        <div class="stat"><div class="stat-title">Status</div><div class="stat-value" id="statusText">-</div></div>
+        <div class="stat"><div class="stat-title">Bidder Count</div><div class="stat-value" id="bidderCount">-</div></div>
+        <div class="stat"><div class="stat-title">Winner</div><div class="stat-value" id="winnerText">-</div></div>
+        <div class="stat"><div class="stat-title">Contract Balance</div><div class="stat-value" id="contractBalance">-</div></div>
+      </div>
+    </section>
+
+    <section class="actions">
+      <div class="card">
+        <h2>Admin Actions</h2>
+        <label>Tender Number</label>
+        <input id="tenderNumber" value="MOH-MED-001-2026" />
+
+        <label>Title</label>
+        <input id="tenderTitle" value="Supply of Medical Equipment" />
+
+        <label>Description</label>
+        <textarea id="tenderDescription">Procurement of essential medical equipment for Ministry of Health facilities</textarea>
+
+        <div class="grid">
+          <div>
+            <label>Deadline Year</label>
+            <input id="deadlineYear" type="number" value="2026" />
+          </div>
+          <div>
+            <label>Deadline Month</label>
+            <input id="deadlineMonth" type="number" value="4" />
+          </div>
+          <div>
+            <label>Deadline Day</label>
+            <input id="deadlineDay" type="number" value="1" />
+          </div>
+          <div>
+            <label>Deadline Hour</label>
+            <input id="deadlineHour" type="number" value="12" />
+          </div>
+          <div>
+            <label>Deadline Minute</label>
+            <input id="deadlineMinute" type="number" value="30" />
+          </div>
+          <div>
+            <label>UTC Offset</label>
+            <input id="utcOffset" type="number" value="3" />
+          </div>
+        </div>
+
+        <label>Contract Amount (wei)</label>
+        <input id="contractAmount" value="100000000000000000" />
+
+        <label>Qualification Note</label>
+        <textarea id="qualificationNote">Only registered and qualified medical equipment suppliers may bid</textarea>
+
+        <button class="btn-primary" id="createTenderBtn">Create Tender</button>
+
+        <hr style="margin:18px 0; border:none; border-top:1px solid var(--border);">
+
+        <label>Inspector Address</label>
+        <input id="inspectorAddress" placeholder="0x..." />
+        <button class="btn-secondary" id="setInspectorBtn">Set Inspector</button>
+
+        <hr style="margin:18px 0; border:none; border-top:1px solid var(--border);">
+
+        <label>Bidder Address</label>
+        <input id="bidderAddress" placeholder="0x..." />
+        <label>Bidder Description</label>
+        <input id="bidderDescription" placeholder="e.g. Kenya Medical Supplies" />
+        <button class="btn-secondary" id="registerBidderBtn">Register Bidder</button>
+
+        <div class="triple">
+          <button class="btn-accent" id="openRevealBtn">Open Reveal Phase</button>
+          <button class="btn-accent" id="evaluateBtn">Evaluate Tender</button>
+          <button class="btn-accent" id="awardBtn">Award Tender</button>
+        </div>
+
+        <label>Fund Contract Amount (ETH)</label>
+        <input id="fundAmountEth" value="0.1" />
+        <button class="btn-primary" id="fundBtn">Fund Contract</button>
+        <button class="btn-primary" id="releasePaymentBtn">Release Payment</button>
+      </div>
+
+      <div class="card">
+        <h2>Bidder Actions</h2>
+        <p class="muted">Use the bidder wallet for these actions.</p>
+
+        <label>Bid Amount (wei)</label>
+        <input id="bidAmountWei" value="80000000000000000" />
+
+        <label>Bid Secret</label>
+        <input id="bidSecret" value="beta" />
+
+        <button class="btn-secondary" id="hashBidBtn">Generate Sealed Bid Hash</button>
+        <label>Generated Sealed Bid Hash</label>
+        <input id="sealedBidHash" placeholder="0x..." />
+        <button class="btn-accent" id="submitSealedBidBtn">Submit Sealed Bid</button>
+        <button class="btn-accent" id="revealBidBtn">Reveal Bid</button>
+
+        <hr style="margin:18px 0; border:none; border-top:1px solid var(--border);">
+
+        <label>Delivery Document Type</label>
+        <input id="deliveryDocType" value="DeliveryNote" />
+        <label>Delivery Reference Number</label>
+        <input id="deliveryRef" value="DN-MOH-2026-001" />
+
+        <div class="grid">
+          <div><label>Year</label><input id="deliveryYear" type="number" value="2026" /></div>
+          <div><label>Month</label><input id="deliveryMonth" type="number" value="4" /></div>
+          <div><label>Day</label><input id="deliveryDay" type="number" value="1" /></div>
+          <div><label>Hour</label><input id="deliveryHour" type="number" value="12" /></div>
+          <div><label>Minute</label><input id="deliveryMinute" type="number" value="45" /></div>
+          <div><label>UTC Offset</label><input id="deliveryOffset" type="number" value="3" /></div>
+        </div>
+
+        <button class="btn-secondary" id="deliveryHashBtn">Generate Delivery Hash</button>
+        <label>Generated Delivery Hash</label>
+        <input id="deliveryHash" placeholder="0x..." />
+        <button class="btn-accent" id="submitDeliveryBtn">Submit Delivery Evidence</button>
+      </div>
+
+      <div class="card">
+        <h2>Inspector Actions</h2>
+        <p class="muted">Use the inspector wallet for these actions.</p>
+
+        <label>Inspection Document Type</label>
+        <input id="inspectionDocType" value="InspectionReport" />
+        <label>Inspection Reference Number</label>
+        <input id="inspectionRef" value="IR-MOH-2026-001" />
+
+        <div class="grid">
+          <div><label>Year</label><input id="inspectionYear" type="number" value="2026" /></div>
+          <div><label>Month</label><input id="inspectionMonth" type="number" value="4" /></div>
+          <div><label>Day</label><input id="inspectionDay" type="number" value="1" /></div>
+          <div><label>Hour</label><input id="inspectionHour" type="number" value="13" /></div>
+          <div><label>Minute</label><input id="inspectionMinute" type="number" value="0" /></div>
+          <div><label>UTC Offset</label><input id="inspectionOffset" type="number" value="3" /></div>
+        </div>
+
+        <button class="btn-secondary" id="inspectionHashBtn">Generate Inspection Hash</button>
+        <label>Generated Inspection Hash</label>
+        <input id="inspectionHash" placeholder="0x..." />
+        <button class="btn-accent" id="acceptDeliveryBtn">Accept Delivery</button>
+
+        <label>Rejection Reason</label>
+        <textarea id="rejectReason">Medical equipment delivered does not meet the required technical specifications</textarea>
+        <button class="btn-danger" id="rejectDeliveryBtn">Reject Delivery</button>
+      </div>
+
+      <div class="card">
+        <h2>Read Functions</h2>
+        <button class="btn-secondary" id="readSummaryBtn">Read Tender Summary</button>
+        <button class="btn-secondary" id="readBiddersBtn">Read Registered Bidders</button>
+        <button class="btn-secondary" id="readWinnerBtn">Read Winner</button>
+        <button class="btn-secondary" id="readBalanceBtn">Read Contract Balance</button>
+
+        <div class="footer-note">
+          Tip: for mobile testing, deploy this file to GitHub Pages or Netlify, then open it in MetaMask mobile browser on Sepolia.
+        </div>
+      </div>
+
+      <div class="card full">
+        <h2>Activity Log</h2>
+        <div id="log" class="log">App ready. Replace the contract address with your deployed Sepolia contract, then connect MetaMask.</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ===============================
+    // 1. REPLACE THIS ADDRESS
+    // ===============================
+    const CONTRACT_ADDRESS = "0x50Ef4C51ACf00cb6051F4d08687A507DecAe0E86";
+
+    // ===============================
+    // 2. ABI (minimal full app ABI)
+    // ===============================
+    const ABI = [
+      "function createTenderWithLocalTime(string,string,string,uint256,uint256,uint256,uint256,uint256,int256,uint256,string)",
+      "function setInspector(address)",
+      "function registerBidder(address,string)",
+      "function getSealedBidHash(uint256,string) view returns (bytes32)",
+      "function submitSealedBid(bytes32)",
+      "function openRevealPhase()",
+      "function revealBid(uint256,string)",
+      "function evaluateTender()",
+      "function awardTender()",
+      "function getDeliveryEvidenceHashWithLocalTime(string,string,uint256,uint256,uint256,uint256,uint256,int256) view returns (uint256,bytes32)",
+      "function submitDeliveryEvidence(bytes32)",
+      "function getInspectionReportHashWithLocalTime(string,string,uint256,uint256,uint256,uint256,uint256,int256) view returns (uint256,bytes32)",
+      "function acceptDelivery(bytes32)",
+      "function rejectDelivery(string)",
+      "function fundContract() payable",
+      "function releasePayment()",
+      "function getCurrentStatusText() view returns (string)",
+      "function getBidderCount() view returns (uint256)",
+      "function winner() view returns (address,string)",
+      "function getContractBalance() view returns (uint256)",
+      "function getTenderSummary() view returns (string,string,string,uint256,uint256,string,uint8,string,address,string,uint256)",
+      "function getAllRegisteredBidders() view returns (uint256[],address[],string[])",
+      "function status() view returns (uint8,string)"
+    ];
+
+    let provider;
+    let signer;
+    let contract;
+    let account;
+
+    const $ = (id) => document.getElementById(id);
+
+    function log(message) {
+      const now = new Date().toLocaleTimeString();
+      const area = $("log");
+      area.textContent = `[${now}] ${message}\n` + area.textContent;
+    }
+
+    function requireConnected() {
+      if (!contract || !signer) {
+        throw new Error("Please connect MetaMask first.");
+      }
+    }
+
+    async function connectWallet() {
+      if (!window.ethereum) {
+        alert("MetaMask not detected. Install MetaMask first.");
+        return;
+      }
+
+      provider = new ethers.BrowserProvider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = await provider.getSigner();
+      account = await signer.getAddress();
+      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+      const network = await provider.getNetwork();
+      $("walletAddress").textContent = account;
+      $("networkName").textContent = `${network.name} (${network.chainId})`;
+      $("contractAddressText").textContent = CONTRACT_ADDRESS;
+
+      log(`Connected wallet: ${account}`);
+      await refreshState();
+    }
+
+    async function refreshState() {
+      try {
+        requireConnected();
+        const statusText = await contract.getCurrentStatusText();
+        const bidderCount = await contract.getBidderCount();
+        const winnerData = await contract.winner();
+        const balanceWei = await contract.getContractBalance();
+        const balanceEth = ethers.formatEther(balanceWei);
+
+        $("statusText").textContent = statusText;
+        $("bidderCount").textContent = bidderCount.toString();
+        $("winnerText").textContent = winnerData[0] === ethers.ZeroAddress ? "No winner yet" : `${winnerData[1]}\n${winnerData[0]}`;
+        $("contractBalance").textContent = `${balanceEth} ETH`;
+
+        log(`State refreshed. Status: ${statusText}`);
+      } catch (err) {
+        log(`Refresh failed: ${readableError(err)}`);
+      }
+    }
+
+    function readableError(err) {
+      return err?.shortMessage || err?.reason || err?.message || String(err);
+    }
+
+    async function sendTx(txPromise, successLabel) {
+      try {
+        requireConnected();
+        const tx = await txPromise;
+        log(`${successLabel}: transaction submitted → ${tx.hash}`);
+        await tx.wait();
+        log(`${successLabel}: transaction confirmed.`);
+        await refreshState();
+      } catch (err) {
+        log(`${successLabel} failed: ${readableError(err)}`);
+      }
+    }
+
+    async function callView(action, successLabel) {
+      try {
+        requireConnected();
+        const result = await action();
+        log(`${successLabel}: ${JSON.stringify(result, (_, v) => typeof v === 'bigint' ? v.toString() : v, 2)}`);
+        return result;
+      } catch (err) {
+        log(`${successLabel} failed: ${readableError(err)}`);
+      }
+    }
+
+    // Buttons
+    $("connectBtn").onclick = connectWallet;
+    $("refreshBtn").onclick = refreshState;
+
+    $("createTenderBtn").onclick = async () => {
+      await sendTx(contract.createTenderWithLocalTime(
+        $("tenderNumber").value,
+        $("tenderTitle").value,
+        $("tenderDescription").value,
+        BigInt($("deadlineYear").value),
+        BigInt($("deadlineMonth").value),
+        BigInt($("deadlineDay").value),
+        BigInt($("deadlineHour").value),
+        BigInt($("deadlineMinute").value),
+        BigInt($("utcOffset").value),
+        BigInt($("contractAmount").value),
+        $("qualificationNote").value
+      ), "Create Tender");
+    };
+
+    $("setInspectorBtn").onclick = async () => {
+      await sendTx(contract.setInspector($("inspectorAddress").value), "Set Inspector");
+    };
+
+    $("registerBidderBtn").onclick = async () => {
+      await sendTx(contract.registerBidder($("bidderAddress").value, $("bidderDescription").value), "Register Bidder");
+    };
+
+    $("openRevealBtn").onclick = async () => {
+      await sendTx(contract.openRevealPhase(), "Open Reveal Phase");
+    };
+
+    $("evaluateBtn").onclick = async () => {
+      await sendTx(contract.evaluateTender(), "Evaluate Tender");
+    };
+
+    $("awardBtn").onclick = async () => {
+      await sendTx(contract.awardTender(), "Award Tender");
+    };
+
+    $("fundBtn").onclick = async () => {
+      const value = ethers.parseEther($("fundAmountEth").value || "0");
+      await sendTx(contract.fundContract({ value }), "Fund Contract");
+    };
+
+    $("releasePaymentBtn").onclick = async () => {
+      await sendTx(contract.releasePayment(), "Release Payment");
+    };
+
+    $("hashBidBtn").onclick = async () => {
+      const result = await callView(
+        () => contract.getSealedBidHash(BigInt($("bidAmountWei").value), $("bidSecret").value),
+        "Generate Sealed Bid Hash"
+      );
+      if (result) $("sealedBidHash").value = result;
+    };
+
+    $("submitSealedBidBtn").onclick = async () => {
+      await sendTx(contract.submitSealedBid($("sealedBidHash").value), "Submit Sealed Bid");
+    };
+
+    $("revealBidBtn").onclick = async () => {
+      await sendTx(contract.revealBid(BigInt($("bidAmountWei").value), $("bidSecret").value), "Reveal Bid");
+    };
+
+    $("deliveryHashBtn").onclick = async () => {
+      const result = await callView(
+        () => contract.getDeliveryEvidenceHashWithLocalTime(
+          $("deliveryDocType").value,
+          $("deliveryRef").value,
+          BigInt($("deliveryYear").value),
+          BigInt($("deliveryMonth").value),
+          BigInt($("deliveryDay").value),
+          BigInt($("deliveryHour").value),
+          BigInt($("deliveryMinute").value),
+          BigInt($("deliveryOffset").value)
+        ),
+        "Generate Delivery Evidence Hash"
+      );
+      if (result) $("deliveryHash").value = result[1];
+    };
+
+    $("submitDeliveryBtn").onclick = async () => {
+      await sendTx(contract.submitDeliveryEvidence($("deliveryHash").value), "Submit Delivery Evidence");
+    };
+
+    $("inspectionHashBtn").onclick = async () => {
+      const result = await callView(
+        () => contract.getInspectionReportHashWithLocalTime(
+          $("inspectionDocType").value,
+          $("inspectionRef").value,
+          BigInt($("inspectionYear").value),
+          BigInt($("inspectionMonth").value),
+          BigInt($("inspectionDay").value),
+          BigInt($("inspectionHour").value),
+          BigInt($("inspectionMinute").value),
+          BigInt($("inspectionOffset").value)
+        ),
+        "Generate Inspection Report Hash"
+      );
+      if (result) $("inspectionHash").value = result[1];
+    };
+
+    $("acceptDeliveryBtn").onclick = async () => {
+      await sendTx(contract.acceptDelivery($("inspectionHash").value), "Accept Delivery");
+    };
+
+    $("rejectDeliveryBtn").onclick = async () => {
+      await sendTx(contract.rejectDelivery($("rejectReason").value), "Reject Delivery");
+    };
+
+    $("readSummaryBtn").onclick = async () => {
+      await callView(() => contract.getTenderSummary(), "Read Tender Summary");
+    };
+
+    $("readBiddersBtn").onclick = async () => {
+      await callView(() => contract.getAllRegisteredBidders(), "Read Registered Bidders");
+    };
+
+    $("readWinnerBtn").onclick = async () => {
+      await callView(() => contract.winner(), "Read Winner");
+    };
+
+    $("readBalanceBtn").onclick = async () => {
+      const result = await callView(() => contract.getContractBalance(), "Read Contract Balance");
+      if (result !== undefined) {
+        log(`Contract balance in ETH: ${ethers.formatEther(result)}`);
+      }
+    };
+
+    if (window.ethereum) {
+      window.ethereum.on("accountsChanged", () => window.location.reload());
+      window.ethereum.on("chainChanged", () => window.location.reload());
+    }
+
+    $("contractAddressText").textContent = CONTRACT_ADDRESS;
+  </script>
+</body>
+</html>
