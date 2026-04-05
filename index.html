@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MoH Procurement Transparency dApp</title>
+  <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" rx="14" fill="%23166534"/%3E%3Cpath d="M32 12 50 20v12c0 12-7.8 18.8-18 22-10.2-3.2-18-10-18-22V20l18-8Z" fill="%23ffffff" opacity="0.95"/%3E%3Cpath d="M32 21c-5.8 0-10.5 4.7-10.5 10.5S26.2 42 32 42s10.5-4.7 10.5-10.5S37.8 21 32 21Zm-1.8 5h3.6v4h4v3.2h-4v4h-3.6v-4h-4V30h4v-4Z" fill="%23166534"/%3E%3C/svg%3E' />
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
   <style>
     :root {
@@ -201,8 +202,54 @@
 
     .full { grid-column: 1 / -1; }
 
+    .time-panel {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fbfcfe 0%, #f7fafc 100%);
+    }
+
+    .time-panel-title {
+      font-weight: 800;
+      margin: 0 0 4px;
+      font-size: 1rem;
+      color: var(--text);
+    }
+
+    .time-panel-subtitle {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .time-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .mini-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .mini-card h4 {
+      margin: 0 0 10px;
+      font-size: 0.92rem;
+      color: var(--accent);
+    }
+
+    .triple-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
     @media (max-width: 980px) {
-      .toolbar, .grid, .triple, .actions, .status-grid {
+      .toolbar, .grid, .triple, .actions, .status-grid, .time-split, .triple-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -214,7 +261,7 @@
       <h1>MoH Procurement Transparency dApp</h1>
       <p>
         A simple mobile-friendly frontend for the Ministry of Health procurement smart contract.
-        Use this with MetaMask on Sepolia. Replace the contract address before deployment.
+        Use this with MetaMask on Sepolia. Tender and bid amounts can be entered in ETH for easier user interaction.
       </p>
     </section>
 
@@ -254,7 +301,7 @@
 
     <section class="actions">
       <div class="card">
-        <h2>Admin Actions</h2>
+        <h2>HoD Procurement Actions</h2>
         <label>Tender Number</label>
         <input id="tenderNumber" value="MOH-MED-001-2026" />
 
@@ -264,35 +311,49 @@
         <label>Description</label>
         <textarea id="tenderDescription">Procurement of essential medical equipment for Ministry of Health facilities</textarea>
 
-        <div class="grid">
-          <div>
-            <label>Deadline Year</label>
-            <input id="deadlineYear" type="number" value="2026" />
-          </div>
-          <div>
-            <label>Deadline Month</label>
-            <input id="deadlineMonth" type="number" value="4" />
-          </div>
-          <div>
-            <label>Deadline Day</label>
-            <input id="deadlineDay" type="number" value="1" />
-          </div>
-          <div>
-            <label>Deadline Hour</label>
-            <input id="deadlineHour" type="number" value="12" />
-          </div>
-          <div>
-            <label>Deadline Minute</label>
-            <input id="deadlineMinute" type="number" value="30" />
-          </div>
-          <div>
-            <label>UTC Offset</label>
-            <input id="utcOffset" type="number" value="3" />
+        <div class="time-panel">
+          <div class="time-panel-title">Tender Deadline</div>
+          <div class="time-panel-subtitle">Enter the tender deadline date and time. Ensure the UTC offset matches your local time zone (e.g., +3 for East Africa Time).</div>
+          <div class="time-split">
+            <div class="mini-card">
+              <h4>Date</h4>
+              <div class="triple-grid">
+                <div>
+                  <label>Year</label>
+                  <input id="deadlineYear" type="number" value="2026" />
+                </div>
+                <div>
+                  <label>Month</label>
+                  <input id="deadlineMonth" type="number" value="4" />
+                </div>
+                <div>
+                  <label>Day</label>
+                  <input id="deadlineDay" type="number" value="1" />
+                </div>
+              </div>
+            </div>
+            <div class="mini-card">
+              <h4>Time (24-Hour Format)</h4>
+              <div class="triple-grid">
+                <div>
+                  <label>Hour</label>
+                  <input id="deadlineHour" type="number" value="12" />
+                </div>
+                <div>
+                  <label>Minute</label>
+                  <input id="deadlineMinute" type="number" value="30" />
+                </div>
+                <div>
+                  <label>UTC Offset</label>
+                  <input id="utcOffset" type="number" value="3" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <label>Contract Amount (wei)</label>
-        <input id="contractAmount" value="100000000000000000" />
+        <label>Contract Amount (ETH)</label>
+        <input id="contractAmountEth" value="0.1" />
 
         <label>Qualification Note</label>
         <textarea id="qualificationNote">Only registered and qualified medical equipment suppliers may bid</textarea>
@@ -329,8 +390,8 @@
         <h2>Bidder Actions</h2>
         <p class="muted">Use the bidder wallet for these actions.</p>
 
-        <label>Bid Amount (wei)</label>
-        <input id="bidAmountWei" value="80000000000000000" />
+        <label>Bid Amount (ETH)</label>
+        <input id="bidAmountEth" value="0.08" />
 
         <label>Bid Secret</label>
         <input id="bidSecret" value="beta" />
@@ -348,13 +409,27 @@
         <label>Delivery Reference Number</label>
         <input id="deliveryRef" value="DN-MOH-2026-001" />
 
-        <div class="grid">
-          <div><label>Year</label><input id="deliveryYear" type="number" value="2026" /></div>
-          <div><label>Month</label><input id="deliveryMonth" type="number" value="4" /></div>
-          <div><label>Day</label><input id="deliveryDay" type="number" value="1" /></div>
-          <div><label>Hour</label><input id="deliveryHour" type="number" value="12" /></div>
-          <div><label>Minute</label><input id="deliveryMinute" type="number" value="45" /></div>
-          <div><label>UTC Offset</label><input id="deliveryOffset" type="number" value="3" /></div>
+        <div class="time-panel">
+          <div class="time-panel-title">Delivery Hash Date</div>
+          <div class="time-panel-subtitle">Enter the delivery timestamp. Ensure values reflect the actual submission time and correct UTC offset.</div>
+          <div class="time-split">
+            <div class="mini-card">
+              <h4>Date</h4>
+              <div class="triple-grid">
+                <div><label>Year</label><input id="deliveryYear" type="number" value="2026" /></div>
+                <div><label>Month</label><input id="deliveryMonth" type="number" value="4" /></div>
+                <div><label>Day</label><input id="deliveryDay" type="number" value="1" /></div>
+              </div>
+            </div>
+            <div class="mini-card">
+              <h4>Time (24-Hour Format)</h4>
+              <div class="triple-grid">
+                <div><label>Hour</label><input id="deliveryHour" type="number" value="12" /></div>
+                <div><label>Minute</label><input id="deliveryMinute" type="number" value="45" /></div>
+                <div><label>UTC Offset</label><input id="deliveryOffset" type="number" value="3" /></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <button class="btn-secondary" id="deliveryHashBtn">Generate Delivery Hash</button>
@@ -372,13 +447,27 @@
         <label>Inspection Reference Number</label>
         <input id="inspectionRef" value="IR-MOH-2026-001" />
 
-        <div class="grid">
-          <div><label>Year</label><input id="inspectionYear" type="number" value="2026" /></div>
-          <div><label>Month</label><input id="inspectionMonth" type="number" value="4" /></div>
-          <div><label>Day</label><input id="inspectionDay" type="number" value="1" /></div>
-          <div><label>Hour</label><input id="inspectionHour" type="number" value="13" /></div>
-          <div><label>Minute</label><input id="inspectionMinute" type="number" value="0" /></div>
-          <div><label>UTC Offset</label><input id="inspectionOffset" type="number" value="3" /></div>
+        <div class="time-panel">
+          <div class="time-panel-title">Inspection Hash Date</div>
+          <div class="time-panel-subtitle">Enter the inspection timestamp. Ensure accuracy and correct UTC offset for verification.</div>
+          <div class="time-split">
+            <div class="mini-card">
+              <h4>Date</h4>
+              <div class="triple-grid">
+                <div><label>Year</label><input id="inspectionYear" type="number" value="2026" /></div>
+                <div><label>Month</label><input id="inspectionMonth" type="number" value="4" /></div>
+                <div><label>Day</label><input id="inspectionDay" type="number" value="1" /></div>
+              </div>
+            </div>
+            <div class="mini-card">
+              <h4>Time (24-Hour Format)</h4>
+              <div class="triple-grid">
+                <div><label>Hour</label><input id="inspectionHour" type="number" value="13" /></div>
+                <div><label>Minute</label><input id="inspectionMinute" type="number" value="0" /></div>
+                <div><label>UTC Offset</label><input id="inspectionOffset" type="number" value="3" /></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <button class="btn-secondary" id="inspectionHashBtn">Generate Inspection Hash</button>
@@ -399,13 +488,13 @@
         <button class="btn-secondary" id="readBalanceBtn">Read Contract Balance</button>
 
         <div class="footer-note">
-          Tip: for mobile testing, deploy this file to GitHub Pages or Netlify, then open it in MetaMask mobile browser on Sepolia.
+          Tip: Connect your wallet and use the buttons above to view on-chain data such as the tender summary, registered bidders, winner, and contract balance.
         </div>
       </div>
 
       <div class="card full">
         <h2>Activity Log</h2>
-        <div id="log" class="log">App ready. Replace the contract address with your deployed Sepolia contract, then connect MetaMask.</div>
+        <div id="log" class="log">App ready. Replace the contract address with your deployed Sepolia contract, then connect MetaMask. Tender and bid amounts are entered in ETH and converted in the frontend before calling the smart contract.</div>
       </div>
     </section>
   </div>
@@ -415,6 +504,11 @@
     // 1. REPLACE THIS ADDRESS
     // ===============================
     const CONTRACT_ADDRESS = "0x50Ef4C51ACf00cb6051F4d08687A507DecAe0E86";
+
+    function ethToWeiBigInt(value) {
+      const normalized = (value || "0").toString().trim();
+      return ethers.parseEther(normalized);
+    }
 
     // ===============================
     // 2. ABI (minimal full app ABI)
@@ -548,7 +642,7 @@
         BigInt($("deadlineHour").value),
         BigInt($("deadlineMinute").value),
         BigInt($("utcOffset").value),
-        BigInt($("contractAmount").value),
+        ethToWeiBigInt($("contractAmountEth").value),
         $("qualificationNote").value
       ), "Create Tender");
     };
@@ -584,7 +678,7 @@
 
     $("hashBidBtn").onclick = async () => {
       const result = await callView(
-        () => contract.getSealedBidHash(BigInt($("bidAmountWei").value), $("bidSecret").value),
+        () => contract.getSealedBidHash(ethToWeiBigInt($("bidAmountEth").value), $("bidSecret").value),
         "Generate Sealed Bid Hash"
       );
       if (result) $("sealedBidHash").value = result;
@@ -595,7 +689,7 @@
     };
 
     $("revealBidBtn").onclick = async () => {
-      await sendTx(contract.revealBid(BigInt($("bidAmountWei").value), $("bidSecret").value), "Reveal Bid");
+      await sendTx(contract.revealBid(ethToWeiBigInt($("bidAmountEth").value), $("bidSecret").value), "Reveal Bid");
     };
 
     $("deliveryHashBtn").onclick = async () => {
