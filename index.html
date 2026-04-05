@@ -142,7 +142,6 @@
     .btn-secondary { background: #e8f5ec; color: var(--primary); }
     .btn-accent { background: var(--accent); color: white; }
     .btn-danger { background: var(--danger); color: white; }
-    .btn-warning { background: var(--warning); color: white; }
 
     .pill {
       display: inline-block;
@@ -178,6 +177,7 @@
       font-size: 1rem;
       font-weight: 700;
       word-break: break-word;
+      white-space: pre-wrap;
     }
 
     .log {
@@ -514,20 +514,12 @@
   </div>
 
   <script>
-    // ===============================
-    // 1. REPLACE THIS ADDRESS
-    // ===============================
     const CONTRACT_ADDRESS = "0x50Ef4C51ACf00cb6051F4d08687A507DecAe0E86";
 
-    function ethToWeiBigInt(value) {
-      const normalized = (value || "0").toString().trim();
-      return ethers.parseEther(normalized);
-    }
-
-    // ===============================
-    // 2. ABI (minimal full app ABI)
-    // ===============================
     const ABI = [
+      "function admin() view returns (address)",
+      "function inspector() view returns (address)",
+      "function registeredBidders(address) view returns (bool)",
       "function createTenderWithLocalTime(string,string,string,uint256,uint256,uint256,uint256,uint256,int256,uint256,string)",
       "function setInspector(address)",
       "function registerBidder(address,string)",
@@ -544,9 +536,6 @@
       "function rejectDelivery(string)",
       "function fundContract() payable",
       "function releasePayment()",
-      "function admin() view returns (address)",
-      "function inspector() view returns (address)",
-      "function registeredBidders(address) view returns (bool)",
       "function getCurrentStatusText() view returns (string)",
       "function getBidderCount() view returns (uint256)",
       "function winner() view returns (address,string)",
@@ -566,7 +555,12 @@
     function log(message) {
       const now = new Date().toLocaleTimeString();
       const area = $("log");
-      area.textContent = `[${now}] ${message}\n` + area.textContent;
+      if (area) area.textContent = `[${now}] ${message}
+` + area.textContent;
+    }
+
+    function readableError(err) {
+      return err?.shortMessage || err?.reason || err?.message || String(err);
     }
 
     function requireConnected() {
@@ -580,7 +574,13 @@
       return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
     }
 
+    function ethToWeiBigInt(value) {
+      const normalized = (value || "0").toString().trim();
+      return ethers.parseEther(normalized);
+    }
+
     async function detectWalletRole(currentAccount) {
+      if (!contract || !currentAccount) return "Unknown";
       try {
         const normalized = currentAccount.toLowerCase();
         const [adminAddr, inspectorAddr, bidderRegistered, winnerData] = await Promise.all([
@@ -591,73 +591,75 @@
         ]);
 
         const winnerAddr = winnerData[0];
-        if (normalized === adminAddr.toLowerCase()) return "HoD Procurement";
-        if (winnerAddr !== ethers.ZeroAddress && normalized === winnerAddr.toLowerCase()) return "Winning Bidder";
-        if (inspectorAddr !== ethers.ZeroAddress && normalized === inspectorAddr.toLowerCase()) return "Inspector";
+        if (adminAddr && normalized === adminAddr.toLowerCase()) return "HoD Procurement";
+        if (winnerAddr && winnerAddr !== ethers.ZeroAddress && normalized === winnerAddr.toLowerCase()) return "Winning Bidder";
+        if (inspectorAddr && inspectorAddr !== ethers.ZeroAddress && normalized === inspectorAddr.toLowerCase()) return "Inspector";
         if (bidderRegistered) return "Registered Bidder";
         return "Unassigned Wallet";
-      } catch (err) {
+      } catch {
         return "Unknown";
       }
     }
 
     async function connectWallet() {
-      if (!window.ethereum) {
-        alert("MetaMask not detected. Install MetaMask first.");
-        return;
+      try {
+        if (!window.ethereum) {
+          alert("MetaMask not detected. Install MetaMask first.");
+          return;
+        }
+
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        account = await signer.getAddress();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+        const network = await provider.getNetwork();
+        const role = await detectWalletRole(account);
+
+        $("walletAddress").textContent = shortAddress(account);
+        const roleEl = $("walletRole");
+        if (roleEl) roleEl.textContent = role;
+        $("networkName").textContent = `${network.name} (${network.chainId})`;
+        $("contractAddressText").textContent = CONTRACT_ADDRESS;
+
+        log(`Connected wallet: ${account} | Detected role: ${role}`);
+        await refreshState();
+      } catch (err) {
+        log(`Connect Wallet failed: ${readableError(err)}`);
       }
-
-      provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      signer = await provider.getSigner();
-      account = await signer.getAddress();
-      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-
-      const network = await provider.getNetwork();
-      const detectedRole = await detectWalletRole(account);
-      $("walletAddress").textContent = shortAddress(account);
-      $("walletRole").textContent = detectedRole;
-      $("networkName").textContent = `${network.name} (${network.chainId})`;
-      $("contractAddressText").textContent = CONTRACT_ADDRESS;
-
-      log(`Connected wallet: ${account} | Detected role: ${detectedRole}`);
-      await refreshState();
     }
 
     async function refreshState() {
       try {
         requireConnected();
-        const [statusText, bidderCount, winnerData, balanceWei, detectedRole] = await Promise.all([
+        const [statusText, bidderCount, winnerData, balanceWei, role] = await Promise.all([
           contract.getCurrentStatusText(),
           contract.getBidderCount(),
           contract.winner(),
           contract.getContractBalance(),
           detectWalletRole(account)
         ]);
-        const balanceEth = ethers.formatEther(balanceWei);
 
         $("walletAddress").textContent = shortAddress(account);
-        $("walletRole").textContent = detectedRole;
+        const roleEl = $("walletRole");
+        if (roleEl) roleEl.textContent = role;
         $("statusText").textContent = statusText;
         $("bidderCount").textContent = bidderCount.toString();
         $("winnerText").textContent = winnerData[0] === ethers.ZeroAddress ? "No winner yet" : `${winnerData[1] || "Winner"}
 ${shortAddress(winnerData[0])}`;
-        $("contractBalance").textContent = `${balanceEth} ETH`;
+        $("contractBalance").textContent = `${ethers.formatEther(balanceWei)} ETH`;
 
-        log(`State refreshed. Status: ${statusText} | Role: ${detectedRole}`);
+        log(`State refreshed. Status: ${statusText} | Role: ${role}`);
       } catch (err) {
         log(`Refresh failed: ${readableError(err)}`);
       }
     }
 
-    function readableError(err) {
-      return err?.shortMessage || err?.reason || err?.message || String(err);
-    }
-
-    async function sendTx(txPromise, successLabel) {
+    async function sendTx(txFactory, successLabel) {
       try {
         requireConnected();
-        const tx = await txPromise;
+        const tx = await txFactory();
         log(`${successLabel}: transaction submitted → ${tx.hash}`);
         await tx.wait();
         log(`${successLabel}: transaction confirmed.`);
@@ -671,149 +673,149 @@ ${shortAddress(winnerData[0])}`;
       try {
         requireConnected();
         const result = await action();
-        log(`${successLabel}: ${JSON.stringify(result, (_, v) => typeof v === 'bigint' ? v.toString() : v, 2)}`);
+        log(`${successLabel}: ${JSON.stringify(result, (_, v) => typeof v === "bigint" ? v.toString() : v, 2)}`);
         return result;
       } catch (err) {
         log(`${successLabel} failed: ${readableError(err)}`);
       }
     }
 
-    // Buttons
-    $("connectBtn").onclick = connectWallet;
-    $("refreshBtn").onclick = refreshState;
+    window.addEventListener("DOMContentLoaded", () => {
+      $("contractAddressText").textContent = CONTRACT_ADDRESS;
 
-    $("createTenderBtn").onclick = async () => {
-      await sendTx(contract.createTenderWithLocalTime(
-        $("tenderNumber").value,
-        $("tenderTitle").value,
-        $("tenderDescription").value,
-        BigInt($("deadlineYear").value),
-        BigInt($("deadlineMonth").value),
-        BigInt($("deadlineDay").value),
-        BigInt($("deadlineHour").value),
-        BigInt($("deadlineMinute").value),
-        BigInt($("utcOffset").value),
-        ethToWeiBigInt($("contractAmountEth").value),
-        $("qualificationNote").value
-      ), "Create Tender");
-    };
+      $("connectBtn").addEventListener("click", connectWallet);
+      $("refreshBtn").addEventListener("click", refreshState);
 
-    $("setInspectorBtn").onclick = async () => {
-      await sendTx(contract.setInspector($("inspectorAddress").value), "Set Inspector");
-    };
+      $("createTenderBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.createTenderWithLocalTime(
+          $("tenderNumber").value,
+          $("tenderTitle").value,
+          $("tenderDescription").value,
+          BigInt($("deadlineYear").value),
+          BigInt($("deadlineMonth").value),
+          BigInt($("deadlineDay").value),
+          BigInt($("deadlineHour").value),
+          BigInt($("deadlineMinute").value),
+          BigInt($("utcOffset").value),
+          ethToWeiBigInt($("contractAmountEth").value),
+          $("qualificationNote").value
+        ), "Create Tender");
+      });
 
-    $("registerBidderBtn").onclick = async () => {
-      await sendTx(contract.registerBidder($("bidderAddress").value, $("bidderDescription").value), "Register Bidder");
-    };
+      $("setInspectorBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.setInspector($("inspectorAddress").value), "Set Inspector");
+      });
 
-    $("openRevealBtn").onclick = async () => {
-      await sendTx(contract.openRevealPhase(), "Open Reveal Phase");
-    };
+      $("registerBidderBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.registerBidder($("bidderAddress").value, $("bidderDescription").value), "Register Bidder");
+      });
 
-    $("evaluateBtn").onclick = async () => {
-      await sendTx(contract.evaluateTender(), "Evaluate Tender");
-    };
+      $("openRevealBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.openRevealPhase(), "Open Reveal Phase");
+      });
 
-    $("awardBtn").onclick = async () => {
-      await sendTx(contract.awardTender(), "Award Tender");
-    };
+      $("evaluateBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.evaluateTender(), "Evaluate Tender");
+      });
 
-    $("fundBtn").onclick = async () => {
-      const value = ethers.parseEther($("fundAmountEth").value || "0");
-      await sendTx(contract.fundContract({ value }), "Fund Contract");
-    };
+      $("awardBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.awardTender(), "Award Tender");
+      });
 
-    $("releasePaymentBtn").onclick = async () => {
-      await sendTx(contract.releasePayment(), "Release Payment");
-    };
+      $("fundBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.fundContract({ value: ethers.parseEther($("fundAmountEth").value || "0") }), "Fund Contract");
+      });
 
-    $("hashBidBtn").onclick = async () => {
-      const result = await callView(
-        () => contract.getSealedBidHash(ethToWeiBigInt($("bidAmountEth").value), $("bidSecret").value),
-        "Generate Sealed Bid Hash"
-      );
-      if (result) $("sealedBidHash").value = result;
-    };
+      $("releasePaymentBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.releasePayment(), "Release Payment");
+      });
 
-    $("submitSealedBidBtn").onclick = async () => {
-      await sendTx(contract.submitSealedBid($("sealedBidHash").value), "Submit Sealed Bid");
-    };
+      $("hashBidBtn").addEventListener("click", async () => {
+        const result = await callView(
+          () => contract.getSealedBidHash(ethToWeiBigInt($("bidAmountEth").value), $("bidSecret").value),
+          "Generate Sealed Bid Hash"
+        );
+        if (result) $("sealedBidHash").value = result;
+      });
 
-    $("revealBidBtn").onclick = async () => {
-      await sendTx(contract.revealBid(ethToWeiBigInt($("bidAmountEth").value), $("bidSecret").value), "Reveal Bid");
-    };
+      $("submitSealedBidBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.submitSealedBid($("sealedBidHash").value), "Submit Sealed Bid");
+      });
 
-    $("deliveryHashBtn").onclick = async () => {
-      const result = await callView(
-        () => contract.getDeliveryEvidenceHashWithLocalTime(
-          $("deliveryDocType").value,
-          $("deliveryRef").value,
-          BigInt($("deliveryYear").value),
-          BigInt($("deliveryMonth").value),
-          BigInt($("deliveryDay").value),
-          BigInt($("deliveryHour").value),
-          BigInt($("deliveryMinute").value),
-          BigInt($("deliveryOffset").value)
-        ),
-        "Generate Delivery Evidence Hash"
-      );
-      if (result) $("deliveryHash").value = result[1];
-    };
+      $("revealBidBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.revealBid(ethToWeiBigInt($("bidAmountEth").value), $("bidSecret").value), "Reveal Bid");
+      });
 
-    $("submitDeliveryBtn").onclick = async () => {
-      await sendTx(contract.submitDeliveryEvidence($("deliveryHash").value), "Submit Delivery Evidence");
-    };
+      $("deliveryHashBtn").addEventListener("click", async () => {
+        const result = await callView(
+          () => contract.getDeliveryEvidenceHashWithLocalTime(
+            $("deliveryDocType").value,
+            $("deliveryRef").value,
+            BigInt($("deliveryYear").value),
+            BigInt($("deliveryMonth").value),
+            BigInt($("deliveryDay").value),
+            BigInt($("deliveryHour").value),
+            BigInt($("deliveryMinute").value),
+            BigInt($("deliveryOffset").value)
+          ),
+          "Generate Delivery Evidence Hash"
+        );
+        if (result) $("deliveryHash").value = result[1];
+      });
 
-    $("inspectionHashBtn").onclick = async () => {
-      const result = await callView(
-        () => contract.getInspectionReportHashWithLocalTime(
-          $("inspectionDocType").value,
-          $("inspectionRef").value,
-          BigInt($("inspectionYear").value),
-          BigInt($("inspectionMonth").value),
-          BigInt($("inspectionDay").value),
-          BigInt($("inspectionHour").value),
-          BigInt($("inspectionMinute").value),
-          BigInt($("inspectionOffset").value)
-        ),
-        "Generate Inspection Report Hash"
-      );
-      if (result) $("inspectionHash").value = result[1];
-    };
+      $("submitDeliveryBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.submitDeliveryEvidence($("deliveryHash").value), "Submit Delivery Evidence");
+      });
 
-    $("acceptDeliveryBtn").onclick = async () => {
-      await sendTx(contract.acceptDelivery($("inspectionHash").value), "Accept Delivery");
-    };
+      $("inspectionHashBtn").addEventListener("click", async () => {
+        const result = await callView(
+          () => contract.getInspectionReportHashWithLocalTime(
+            $("inspectionDocType").value,
+            $("inspectionRef").value,
+            BigInt($("inspectionYear").value),
+            BigInt($("inspectionMonth").value),
+            BigInt($("inspectionDay").value),
+            BigInt($("inspectionHour").value),
+            BigInt($("inspectionMinute").value),
+            BigInt($("inspectionOffset").value)
+          ),
+          "Generate Inspection Report Hash"
+        );
+        if (result) $("inspectionHash").value = result[1];
+      });
 
-    $("rejectDeliveryBtn").onclick = async () => {
-      await sendTx(contract.rejectDelivery($("rejectReason").value), "Reject Delivery");
-    };
+      $("acceptDeliveryBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.acceptDelivery($("inspectionHash").value), "Accept Delivery");
+      });
 
-    $("readSummaryBtn").onclick = async () => {
-      await callView(() => contract.getTenderSummary(), "Read Tender Summary");
-    };
+      $("rejectDeliveryBtn").addEventListener("click", async () => {
+        await sendTx(() => contract.rejectDelivery($("rejectReason").value), "Reject Delivery");
+      });
 
-    $("readBiddersBtn").onclick = async () => {
-      await callView(() => contract.getAllRegisteredBidders(), "Read Registered Bidders");
-    };
+      $("readSummaryBtn").addEventListener("click", async () => {
+        await callView(() => contract.getTenderSummary(), "Read Tender Summary");
+      });
 
-    $("readWinnerBtn").onclick = async () => {
-      await callView(() => contract.winner(), "Read Winner");
-    };
+      $("readBiddersBtn").addEventListener("click", async () => {
+        await callView(() => contract.getAllRegisteredBidders(), "Read Registered Bidders");
+      });
 
-    $("readBalanceBtn").onclick = async () => {
-      const result = await callView(() => contract.getContractBalance(), "Read Contract Balance");
-      if (result !== undefined) {
-        log(`Contract balance in ETH: ${ethers.formatEther(result)}`);
+      $("readWinnerBtn").addEventListener("click", async () => {
+        await callView(() => contract.winner(), "Read Winner");
+      });
+
+      $("readBalanceBtn").addEventListener("click", async () => {
+        const result = await callView(() => contract.getContractBalance(), "Read Contract Balance");
+        if (result !== undefined) {
+          log(`Contract balance in ETH: ${ethers.formatEther(result)}`);
+        }
+      });
+
+      if (window.ethereum) {
+        window.ethereum.on("accountsChanged", () => window.location.reload());
+        window.ethereum.on("chainChanged", () => window.location.reload());
       }
-    };
-
-    if (window.ethereum) {
-      window.ethereum.on("accountsChanged", () => window.location.reload());
-      window.ethereum.on("chainChanged", () => window.location.reload());
-    }
-
-    $("contractAddressText").textContent = CONTRACT_ADDRESS;
+    });
   </script>
 </body>
 </html>
