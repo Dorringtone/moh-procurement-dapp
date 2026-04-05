@@ -272,6 +272,7 @@
         <button class="btn-primary" id="connectBtn">Connect Wallet</button>
         <div style="margin-top:12px;"></div>
         <div><strong>Connected wallet:</strong> <span id="walletAddress">Not connected</span></div>
+        <div><strong>Detected role:</strong> <span id="walletRole">Unknown</span></div>
         <div><strong>Network:</strong> <span id="networkName">Unknown</span></div>
       </div>
 
@@ -530,6 +531,9 @@
       "function rejectDelivery(string)",
       "function fundContract() payable",
       "function releasePayment()",
+      "function admin() view returns (address)",
+      "function inspector() view returns (address)",
+      "function registeredBidders(address) view returns (bool)",
       "function getCurrentStatusText() view returns (string)",
       "function getBidderCount() view returns (uint256)",
       "function winner() view returns (address,string)",
@@ -558,6 +562,32 @@
       }
     }
 
+    function shortAddress(addr) {
+      if (!addr || addr === ethers.ZeroAddress) return "Unknown";
+      return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+    }
+
+    async function detectWalletRole(currentAccount) {
+      try {
+        const normalized = currentAccount.toLowerCase();
+        const [adminAddr, inspectorAddr, bidderRegistered, winnerData] = await Promise.all([
+          contract.admin(),
+          contract.inspector(),
+          contract.registeredBidders(currentAccount),
+          contract.winner()
+        ]);
+
+        const winnerAddr = winnerData[0];
+        if (normalized === adminAddr.toLowerCase()) return "HoD Procurement";
+        if (winnerAddr !== ethers.ZeroAddress && normalized === winnerAddr.toLowerCase()) return "Winning Bidder";
+        if (inspectorAddr !== ethers.ZeroAddress && normalized === inspectorAddr.toLowerCase()) return "Inspector";
+        if (bidderRegistered) return "Registered Bidder";
+        return "Unassigned Wallet";
+      } catch (err) {
+        return "Unknown";
+      }
+    }
+
     async function connectWallet() {
       if (!window.ethereum) {
         alert("MetaMask not detected. Install MetaMask first.");
@@ -571,29 +601,37 @@
       contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
 
       const network = await provider.getNetwork();
-      $("walletAddress").textContent = account;
+      const detectedRole = await detectWalletRole(account);
+      $("walletAddress").textContent = shortAddress(account);
+      $("walletRole").textContent = detectedRole;
       $("networkName").textContent = `${network.name} (${network.chainId})`;
       $("contractAddressText").textContent = CONTRACT_ADDRESS;
 
-      log(`Connected wallet: ${account}`);
+      log(`Connected wallet: ${account} | Detected role: ${detectedRole}`);
       await refreshState();
     }
 
     async function refreshState() {
       try {
         requireConnected();
-        const statusText = await contract.getCurrentStatusText();
-        const bidderCount = await contract.getBidderCount();
-        const winnerData = await contract.winner();
-        const balanceWei = await contract.getContractBalance();
+        const [statusText, bidderCount, winnerData, balanceWei, detectedRole] = await Promise.all([
+          contract.getCurrentStatusText(),
+          contract.getBidderCount(),
+          contract.winner(),
+          contract.getContractBalance(),
+          detectWalletRole(account)
+        ]);
         const balanceEth = ethers.formatEther(balanceWei);
 
+        $("walletAddress").textContent = shortAddress(account);
+        $("walletRole").textContent = detectedRole;
         $("statusText").textContent = statusText;
         $("bidderCount").textContent = bidderCount.toString();
-        $("winnerText").textContent = winnerData[0] === ethers.ZeroAddress ? "No winner yet" : `${winnerData[1]}\n${winnerData[0]}`;
+        $("winnerText").textContent = winnerData[0] === ethers.ZeroAddress ? "No winner yet" : `${winnerData[1] || "Winner"}
+${shortAddress(winnerData[0])}`;
         $("contractBalance").textContent = `${balanceEth} ETH`;
 
-        log(`State refreshed. Status: ${statusText}`);
+        log(`State refreshed. Status: ${statusText} | Role: ${detectedRole}`);
       } catch (err) {
         log(`Refresh failed: ${readableError(err)}`);
       }
