@@ -31,9 +31,9 @@
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1500px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 20px 28px;
     }
 
     .hero {
@@ -109,13 +109,14 @@
 
     input, textarea, select {
       width: 100%;
-      padding: 12px 14px;
+      min-width: 0;
+      padding: 12px 16px;
       border-radius: 12px;
       border: 1px solid var(--border);
       outline: none;
       background: #fff;
       color: var(--text);
-      font-size: 0.95rem;
+      font-size: 1rem;
     }
 
     textarea {
@@ -225,8 +226,9 @@
 
     .time-split {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(320px, 1.15fr) minmax(320px, 1fr);
       gap: 14px;
+      align-items: start;
     }
 
     .mini-card {
@@ -244,13 +246,24 @@
 
     .triple-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: minmax(110px, 1.25fr) minmax(90px, 1fr) minmax(90px, 1fr);
       gap: 12px;
+      align-items: end;
+    }
+
+    @media (max-width: 1200px) {
+      .actions {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 980px) {
-      .toolbar, .grid, .triple, .actions, .status-grid, .time-split, .triple-grid {
+      .toolbar, .grid, .triple, .status-grid, .time-split, .triple-grid {
         grid-template-columns: 1fr;
+      }
+
+      .container {
+        padding: 16px;
       }
     }
   </style>
