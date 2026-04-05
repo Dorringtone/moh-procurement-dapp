@@ -187,7 +187,7 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      max-width: 380px;
+      max-width: 420px;
       pointer-events: none;
     }
 
@@ -213,6 +213,7 @@
       line-height: 1.4;
       word-break: break-word;
       flex: 1;
+      white-space: pre-wrap;
     }
 
     .toast-close {
@@ -329,6 +330,7 @@
 </head>
 <body>
   <div id="toastContainer" class="toast-container"></div>
+
   <div class="container">
     <section class="hero">
       <h1>MoH Procurement Transparency dApp</h1>
@@ -605,18 +607,21 @@
       "function status() view returns (uint8,string)"
     ];
 
-    let provider;
-    let signer;
-    let contract;
-    let account;
+    let provider = null;
+    let signer = null;
+    let contract = null;
+    let account = null;
+    let isConnected = false;
+    let pendingToastRef = null;
 
     const $ = (id) => document.getElementById(id);
 
     function log(message) {
       const now = new Date().toLocaleTimeString();
       const area = $("log");
-      if (area) area.textContent = `[${now}] ${message}
-` + area.textContent;
+      if (area) {
+        area.textContent = `[${now}] ${message}\n` + area.textContent;
+      }
     }
 
     function readableError(err) {
@@ -627,8 +632,11 @@
         err?.info?.error?.message ||
         String(err);
 
-      const normalized = raw.toLowerCase();
+      const normalized = String(raw).toLowerCase();
 
+      if (normalized.includes("user rejected") || normalized.includes("user denied")) {
+        return "Transaction was cancelled in MetaMask.";
+      }
       if (normalized.includes("onlyadmin")) {
         return "Only HoD Procurement can perform this action.";
       }
@@ -650,13 +658,16 @@
       if (normalized.includes("execution reverted")) {
         return "Transaction rejected: You are not authorized to perform this action.";
       }
+      if (normalized.includes("insufficient funds")) {
+        return "The wallet has insufficient ETH to complete this transaction.";
+      }
 
       return raw;
     }
 
     function showToast(message, type = "info", timeout = 4500) {
       const container = $("toastContainer");
-      if (!container) return;
+      if (!container) return null;
 
       const toast = document.createElement("div");
       toast.className = `toast toast-${type}`;
@@ -680,6 +691,38 @@
           if (toast.parentNode) toast.remove();
         }, timeout);
       }
+
+      return toast;
+    }
+
+    function showPersistentToast(message, type = "info") {
+      return showToast(message, type, 0);
+    }
+
+    function removeToast(toastRef) {
+      if (toastRef && toastRef.parentNode) {
+        toastRef.remove();
+      }
+    }
+
+    function setConnectedUi(connected) {
+      isConnected = connected;
+      const connectBtn = $("connectBtn");
+      if (connectBtn) {
+        connectBtn.textContent = connected ? "Disconnect Wallet" : "Connect Wallet";
+        connectBtn.className = connected ? "btn-danger" : "btn-primary";
+      }
+    }
+
+    function clearWalletUi() {
+      $("walletAddress").textContent = "Not connected";
+      $("walletRole").textContent = "Unknown";
+      $("networkName").textContent = "Unknown";
+      $("statusText").textContent = "-";
+      $("bidderCount").textContent = "-";
+      $("winnerText").textContent = "-";
+      $("contractBalance").textContent = "-";
+      setConnectedUi(false);
     }
 
     function requireConnected() {
@@ -720,15 +763,66 @@
       }
     }
 
+    async function disconnectWallet() {
+      try {
+        if (window.ethereum?.request) {
+          try {
+            await window.ethereum.request({
+              method: "wallet_revokePermissions",
+              params: [{ eth_accounts: {} }]
+            });
+            log("Wallet permission revoked for this dApp.");
+          } catch (revokeErr) {
+            log(`Permission revoke not completed: ${readableError(revokeErr)}`);
+          }
+        }
+
+        provider = null;
+        signer = null;
+        contract = null;
+        account = null;
+
+        clearWalletUi();
+        log("Wallet disconnected from dApp session.");
+        showToast("Wallet disconnected. Click again to connect a different address.", "info", 5000);
+      } catch (err) {
+        const msg = readableError(err);
+        log(`Disconnect Wallet failed: ${msg}`);
+        showToast(`Disconnect Wallet failed: ${msg}`, "error", 6000);
+      }
+    }
+
     async function connectWallet() {
       try {
         if (!window.ethereum) {
-          alert("MetaMask not detected. Install MetaMask first.");
+          showToast("MetaMask not detected. Install MetaMask first.", "error", 6000);
+          return;
+        }
+
+        if (isConnected && account) {
+          await disconnectWallet();
           return;
         }
 
         provider = new ethers.BrowserProvider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
+
+        try {
+          await window.ethereum.request({
+            method: "wallet_requestPermissions",
+            params: [{ eth_accounts: {} }]
+          });
+        } catch (permissionErr) {
+          log(`Permission request note: ${readableError(permissionErr)}`);
+        }
+
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts"
+        });
+
+        if (!accounts || !accounts.length) {
+          throw new Error("No wallet account was selected.");
+        }
+
         signer = await provider.getSigner();
         account = await signer.getAddress();
         contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
@@ -737,13 +831,14 @@
         const role = await detectWalletRole(account);
 
         $("walletAddress").textContent = shortAddress(account);
-        const roleEl = $("walletRole");
-        if (roleEl) roleEl.textContent = role;
+        $("walletRole").textContent = role;
         $("networkName").textContent = `${network.name} (${network.chainId})`;
         $("contractAddressText").textContent = CONTRACT_ADDRESS;
+        setConnectedUi(true);
 
         log(`Connected wallet: ${account} | Detected role: ${role}`);
         showToast(`Wallet connected successfully. Role: ${role}.`, "success");
+
         await refreshState();
       } catch (err) {
         const msg = readableError(err);
@@ -755,6 +850,7 @@
     async function refreshState() {
       try {
         requireConnected();
+
         const [statusText, bidderCount, winnerData, balanceWei, role] = await Promise.all([
           contract.getCurrentStatusText(),
           contract.getBidderCount(),
@@ -764,12 +860,13 @@
         ]);
 
         $("walletAddress").textContent = shortAddress(account);
-        const roleEl = $("walletRole");
-        if (roleEl) roleEl.textContent = role;
+        $("walletRole").textContent = role;
         $("statusText").textContent = statusText;
         $("bidderCount").textContent = bidderCount.toString();
-        $("winnerText").textContent = winnerData[0] === ethers.ZeroAddress ? "No winner yet" : `${winnerData[1] || "Winner"}
-${shortAddress(winnerData[0])}`;
+        $("winnerText").textContent =
+          winnerData[0] === ethers.ZeroAddress
+            ? "No winner yet"
+            : `${winnerData[1] || "Winner"}\n${shortAddress(winnerData[0])}`;
         $("contractBalance").textContent = `${ethers.formatEther(balanceWei)} ETH`;
 
         log(`State refreshed. Status: ${statusText} | Role: ${role}`);
@@ -781,14 +878,34 @@ ${shortAddress(winnerData[0])}`;
     async function sendTx(txFactory, successLabel) {
       try {
         requireConnected();
+
+        pendingToastRef = showPersistentToast(
+          `${successLabel} pending. Confirm in MetaMask and wait for blockchain confirmation...`,
+          "info"
+        );
+
         const tx = await txFactory();
+
+        removeToast(pendingToastRef);
+        pendingToastRef = showPersistentToast(
+          `${successLabel} submitted.\nTx: ${tx.hash}\nWaiting for confirmation...`,
+          "info"
+        );
+
         log(`${successLabel}: transaction submitted → ${tx.hash}`);
-        showToast(`${successLabel} submitted. Waiting for confirmation...`, "info", 3500);
+
         await tx.wait();
+
+        removeToast(pendingToastRef);
+        pendingToastRef = null;
+
         log(`${successLabel}: transaction confirmed.`);
         showToast(`${successLabel} completed successfully.`, "success");
         await refreshState();
       } catch (err) {
+        removeToast(pendingToastRef);
+        pendingToastRef = null;
+
         const msg = readableError(err);
         log(`${successLabel} failed: ${msg}`);
         showToast(`${successLabel} failed: ${msg}`, "error", 6500);
@@ -811,6 +928,7 @@ ${shortAddress(winnerData[0])}`;
 
     window.addEventListener("DOMContentLoaded", () => {
       $("contractAddressText").textContent = CONTRACT_ADDRESS;
+      clearWalletUi();
 
       $("connectBtn").addEventListener("click", connectWallet);
       $("refreshBtn").addEventListener("click", refreshState);
@@ -852,7 +970,10 @@ ${shortAddress(winnerData[0])}`;
       });
 
       $("fundBtn").addEventListener("click", async () => {
-        await sendTx(() => contract.fundContract({ value: ethers.parseEther($("fundAmountEth").value || "0") }), "Fund Contract");
+        await sendTx(
+          () => contract.fundContract({ value: ethers.parseEther($("fundAmountEth").value || "0") }),
+          "Fund Contract"
+        );
       });
 
       $("releasePaymentBtn").addEventListener("click", async () => {
@@ -941,8 +1062,60 @@ ${shortAddress(winnerData[0])}`;
       });
 
       if (window.ethereum) {
-        window.ethereum.on("accountsChanged", () => window.location.reload());
-        window.ethereum.on("chainChanged", () => window.location.reload());
+        window.ethereum.on("accountsChanged", async (accounts) => {
+          try {
+            if (!accounts || accounts.length === 0) {
+              await disconnectWallet();
+              log("MetaMask disconnected all accounts.");
+              showToast("All wallet accounts were disconnected.", "info", 5000);
+              return;
+            }
+
+            provider = new ethers.BrowserProvider(window.ethereum);
+            signer = await provider.getSigner();
+            account = accounts[0];
+            contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+            const network = await provider.getNetwork();
+            const role = await detectWalletRole(account);
+
+            $("walletAddress").textContent = shortAddress(account);
+            $("walletRole").textContent = role;
+            $("networkName").textContent = `${network.name} (${network.chainId})`;
+            setConnectedUi(true);
+
+            log(`Active wallet changed to: ${account} | Detected role: ${role}`);
+            showToast(`Wallet switched successfully. Role: ${role}.`, "success", 5000);
+
+            await refreshState();
+          } catch (err) {
+            const msg = readableError(err);
+            log(`Account switch handling failed: ${msg}`);
+            showToast(`Account switch handling failed: ${msg}`, "error", 6000);
+          }
+        });
+
+        window.ethereum.on("chainChanged", async () => {
+          try {
+            if (!account) return;
+
+            provider = new ethers.BrowserProvider(window.ethereum);
+            signer = await provider.getSigner();
+            contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+            const network = await provider.getNetwork();
+            $("networkName").textContent = `${network.name} (${network.chainId})`;
+
+            log(`Network changed to ${network.name} (${network.chainId}).`);
+            showToast(`Network changed to ${network.name}.`, "info", 4000);
+
+            await refreshState();
+          } catch (err) {
+            const msg = readableError(err);
+            log(`Network change handling failed: ${msg}`);
+            showToast(`Network change handling failed: ${msg}`, "error", 6000);
+          }
+        });
       }
     });
   </script>
