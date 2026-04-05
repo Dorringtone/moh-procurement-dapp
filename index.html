@@ -17,7 +17,6 @@
       --primary-2: #15803d;
       --accent: #0f766e;
       --danger: #b91c1c;
-      --warning: #b45309;
       --shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
       --radius: 18px;
     }
@@ -180,6 +179,60 @@
       white-space: pre-wrap;
     }
 
+    .toast-container {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 380px;
+      pointer-events: none;
+    }
+
+    .toast {
+      border-radius: 14px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+      color: white;
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+      animation: slideIn 0.2s ease-out;
+      pointer-events: auto;
+    }
+
+    .toast-success { background: #166534; }
+    .toast-error { background: #b91c1c; }
+    .toast-info { background: #0f766e; }
+
+    .toast-text {
+      font-size: 0.95rem;
+      line-height: 1.4;
+      word-break: break-word;
+      flex: 1;
+    }
+
+    .toast-close {
+      background: transparent;
+      color: white;
+      border: none;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1;
+      min-width: auto;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .log {
       background: #0f172a;
       color: #e2e8f0;
@@ -265,10 +318,17 @@
       .container {
         padding: 16px;
       }
+
+      .toast-container {
+        left: 16px;
+        right: 16px;
+        max-width: none;
+      }
     }
   </style>
 </head>
 <body>
+  <div id="toastContainer" class="toast-container"></div>
   <div class="container">
     <section class="hero">
       <h1>MoH Procurement Transparency dApp</h1>
@@ -559,49 +619,68 @@
 ` + area.textContent;
     }
 
-	function readableError(err) {
-	  const raw =
-		err?.shortMessage ||
-		err?.reason ||
-		err?.message ||
-		err?.info?.error?.message ||
-		String(err);
+    function readableError(err) {
+      const raw =
+        err?.shortMessage ||
+        err?.reason ||
+        err?.message ||
+        err?.info?.error?.message ||
+        String(err);
 
-	  const normalized = raw.toLowerCase();
+      const normalized = raw.toLowerCase();
 
-	  // Custom contract role errors
-	  if (normalized.includes("execution reverted")) {
-		// fallback mapping for common actions
-		return "Transaction rejected: You are not authorized to perform this action.";
-	  }
+      if (normalized.includes("onlyadmin")) {
+        return "Only HoD Procurement can perform this action.";
+      }
+      if (normalized.includes("onlyinspector")) {
+        return "Only the assigned inspector can perform this action.";
+      }
+      if (normalized.includes("onlywinner")) {
+        return "Only the winning bidder can perform this action.";
+      }
+      if (normalized.includes("notregisteredbidder")) {
+        return "Only a registered bidder can perform this action.";
+      }
+      if (normalized.includes("invalidtenderstage")) {
+        return "This action is not allowed at the current tender stage.";
+      }
+      if (normalized.includes("tenderdoesnotexist")) {
+        return "No tender has been created yet.";
+      }
+      if (normalized.includes("execution reverted")) {
+        return "Transaction rejected: You are not authorized to perform this action.";
+      }
 
-	  if (normalized.includes("onlyadmin")) {
-		return "Only HoD Procurement can perform this action.";
-	  }
+      return raw;
+    }
 
-	  if (normalized.includes("onlyinspector")) {
-		return "Only the assigned inspector can perform this action.";
-	  }
+    function showToast(message, type = "info", timeout = 4500) {
+      const container = $("toastContainer");
+      if (!container) return;
 
-	  if (normalized.includes("onlywinner")) {
-		return "Only the winning bidder can perform this action.";
-	  }
+      const toast = document.createElement("div");
+      toast.className = `toast toast-${type}`;
 
-	  if (normalized.includes("notregisteredbidder")) {
-		return "Only a registered bidder can perform this action.";
-	  }
+      const text = document.createElement("div");
+      text.className = "toast-text";
+      text.textContent = message;
 
-	  if (normalized.includes("invalidtenderstage")) {
-		return "This action is not allowed at the current tender stage.";
-	  }
+      const closeBtn = document.createElement("button");
+      closeBtn.className = "toast-close";
+      closeBtn.type = "button";
+      closeBtn.textContent = "×";
+      closeBtn.onclick = () => toast.remove();
 
-	  if (normalized.includes("tenderdoesnotexist")) {
-		return "No tender has been created yet.";
-	  }
+      toast.appendChild(text);
+      toast.appendChild(closeBtn);
+      container.appendChild(toast);
 
-	  return raw;
-	}
-
+      if (timeout > 0) {
+        setTimeout(() => {
+          if (toast.parentNode) toast.remove();
+        }, timeout);
+      }
+    }
 
     function requireConnected() {
       if (!contract || !signer) {
@@ -664,9 +743,12 @@
         $("contractAddressText").textContent = CONTRACT_ADDRESS;
 
         log(`Connected wallet: ${account} | Detected role: ${role}`);
+        showToast(`Wallet connected successfully. Role: ${role}.`, "success");
         await refreshState();
       } catch (err) {
-        log(`Connect Wallet failed: ${readableError(err)}`);
+        const msg = readableError(err);
+        log(`Connect Wallet failed: ${msg}`);
+        showToast(`Connect Wallet failed: ${msg}`, "error", 6000);
       }
     }
 
@@ -701,11 +783,15 @@ ${shortAddress(winnerData[0])}`;
         requireConnected();
         const tx = await txFactory();
         log(`${successLabel}: transaction submitted → ${tx.hash}`);
+        showToast(`${successLabel} submitted. Waiting for confirmation...`, "info", 3500);
         await tx.wait();
         log(`${successLabel}: transaction confirmed.`);
+        showToast(`${successLabel} completed successfully.`, "success");
         await refreshState();
       } catch (err) {
-        log(`${successLabel} failed: ${readableError(err)}`);
+        const msg = readableError(err);
+        log(`${successLabel} failed: ${msg}`);
+        showToast(`${successLabel} failed: ${msg}`, "error", 6500);
       }
     }
 
@@ -714,9 +800,12 @@ ${shortAddress(winnerData[0])}`;
         requireConnected();
         const result = await action();
         log(`${successLabel}: ${JSON.stringify(result, (_, v) => typeof v === "bigint" ? v.toString() : v, 2)}`);
+        showToast(`${successLabel} completed.`, "success", 3000);
         return result;
       } catch (err) {
-        log(`${successLabel} failed: ${readableError(err)}`);
+        const msg = readableError(err);
+        log(`${successLabel} failed: ${msg}`);
+        showToast(`${successLabel} failed: ${msg}`, "error", 6500);
       }
     }
 
