@@ -396,15 +396,15 @@
               <div class="triple-grid">
                 <div>
                   <label>Year</label>
-                  <input id="deadlineYear" type="number" value="2026" />
+                  <input id="deadlineYear" type="number" value="2026" min="2024" max="2100" />
                 </div>
                 <div>
                   <label>Month</label>
-                  <input id="deadlineMonth" type="number" value="4" />
+                  <input id="deadlineMonth" type="number" value="4" min="1" max="12" />
                 </div>
                 <div>
                   <label>Day</label>
-                  <input id="deadlineDay" type="number" value="1" />
+                  <input id="deadlineDay" type="number" value="1" min="1" max="31" />
                 </div>
               </div>
             </div>
@@ -413,15 +413,15 @@
               <div class="triple-grid">
                 <div>
                   <label>Hour</label>
-                  <input id="deadlineHour" type="number" value="12" />
+                  <input id="deadlineHour" type="number" value="12" min="0" max="23" />
                 </div>
                 <div>
                   <label>Minute</label>
-                  <input id="deadlineMinute" type="number" value="30" />
+                  <input id="deadlineMinute" type="number" value="30" min="0" max="59" />
                 </div>
                 <div>
                   <label>UTC Offset</label>
-                  <input id="utcOffset" type="number" value="3" />
+                  <input id="utcOffset" type="number" value="3" min="-12" max="14" />
                 </div>
               </div>
             </div>
@@ -492,17 +492,17 @@
             <div class="mini-card">
               <h4>Date</h4>
               <div class="triple-grid">
-                <div><label>Year</label><input id="deliveryYear" type="number" value="2026" /></div>
-                <div><label>Month</label><input id="deliveryMonth" type="number" value="4" /></div>
-                <div><label>Day</label><input id="deliveryDay" type="number" value="1" /></div>
+                <div><label>Year</label><input id="deliveryYear" type="number" value="2026" min="2024" max="2100" /></div>
+                <div><label>Month</label><input id="deliveryMonth" type="number" value="4" min="1" max="12" /></div>
+                <div><label>Day</label><input id="deliveryDay" type="number" value="1" min="1" max="31" /></div>
               </div>
             </div>
             <div class="mini-card">
               <h4>Time (24-Hour Format)</h4>
               <div class="triple-grid">
-                <div><label>Hour</label><input id="deliveryHour" type="number" value="12" /></div>
-                <div><label>Minute</label><input id="deliveryMinute" type="number" value="45" /></div>
-                <div><label>UTC Offset</label><input id="deliveryOffset" type="number" value="3" /></div>
+                <div><label>Hour</label><input id="deliveryHour" type="number" value="12" min="0" max="23" /></div>
+                <div><label>Minute</label><input id="deliveryMinute" type="number" value="45" min="0" max="59" /></div>
+                <div><label>UTC Offset</label><input id="deliveryOffset" type="number" value="3" min="-12" max="14" /></div>
               </div>
             </div>
           </div>
@@ -530,17 +530,17 @@
             <div class="mini-card">
               <h4>Date</h4>
               <div class="triple-grid">
-                <div><label>Year</label><input id="inspectionYear" type="number" value="2026" /></div>
-                <div><label>Month</label><input id="inspectionMonth" type="number" value="4" /></div>
-                <div><label>Day</label><input id="inspectionDay" type="number" value="1" /></div>
+                <div><label>Year</label><input id="inspectionYear" type="number" value="2026" min="2024" max="2100" /></div>
+                <div><label>Month</label><input id="inspectionMonth" type="number" value="4" min="1" max="12" /></div>
+                <div><label>Day</label><input id="inspectionDay" type="number" value="1" min="1" max="31" /></div>
               </div>
             </div>
             <div class="mini-card">
               <h4>Time (24-Hour Format)</h4>
               <div class="triple-grid">
-                <div><label>Hour</label><input id="inspectionHour" type="number" value="13" /></div>
-                <div><label>Minute</label><input id="inspectionMinute" type="number" value="0" /></div>
-                <div><label>UTC Offset</label><input id="inspectionOffset" type="number" value="3" /></div>
+                <div><label>Hour</label><input id="inspectionHour" type="number" value="13" min="0" max="23" /></div>
+                <div><label>Minute</label><input id="inspectionMinute" type="number" value="0" min="0" max="59" /></div>
+                <div><label>UTC Offset</label><input id="inspectionOffset" type="number" value="3" min="-12" max="14" /></div>
               </div>
             </div>
           </div>
@@ -613,6 +613,10 @@
     let account = null;
     let isConnected = false;
     let pendingToastRef = null;
+    let suppressNextAccountsChangedToast = false;
+    let suppressNextDisconnectToast = false;
+    let lastToastSignature = null;
+    let lastToastAt = 0;
 
     const $ = (id) => document.getElementById(id);
 
@@ -668,6 +672,16 @@
     function showToast(message, type = "info", timeout = 4500) {
       const container = $("toastContainer");
       if (!container) return null;
+
+      const signature = `${type}::${message}`;
+      const now = Date.now();
+
+      if (lastToastSignature === signature && now - lastToastAt < 1200) {
+        return null;
+      }
+
+      lastToastSignature = signature;
+      lastToastAt = now;
 
       const toast = document.createElement("div");
       toast.className = `toast toast-${type}`;
@@ -741,6 +755,102 @@
       return ethers.parseEther(normalized);
     }
 
+    function parseIntField(id) {
+      return Number($(id).value);
+    }
+
+    function daysInMonth(year, month) {
+      return new Date(year, month, 0).getDate();
+    }
+
+    function validateDateTimeParts({ year, month, day, hour, minute, offset }, label) {
+      if (!Number.isInteger(year) || year < 2024 || year > 2100) {
+        throw new Error(`${label}: Year must be between 2024 and 2100.`);
+      }
+      if (!Number.isInteger(month) || month < 1 || month > 12) {
+        throw new Error(`${label}: Month must be between 1 and 12.`);
+      }
+      const maxDay = daysInMonth(year, month);
+      if (!Number.isInteger(day) || day < 1 || day > maxDay) {
+        throw new Error(`${label}: Day must be between 1 and ${maxDay} for the selected month.`);
+      }
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+        throw new Error(`${label}: Hour must be between 0 and 23.`);
+      }
+      if (!Number.isInteger(minute) || minute < 0 || minute > 59) {
+        throw new Error(`${label}: Minute must be between 0 and 59.`);
+      }
+      if (!Number.isInteger(offset) || offset < -12 || offset > 14) {
+        throw new Error(`${label}: UTC offset must be between -12 and 14.`);
+      }
+    }
+
+    function localPartsToUtcDate(year, month, day, hour, minute, offset) {
+      return new Date(Date.UTC(year, month - 1, day, hour - offset, minute, 0));
+    }
+
+    function getTenderDeadlineInputs() {
+      const data = {
+        year: parseIntField("deadlineYear"),
+        month: parseIntField("deadlineMonth"),
+        day: parseIntField("deadlineDay"),
+        hour: parseIntField("deadlineHour"),
+        minute: parseIntField("deadlineMinute"),
+        offset: parseIntField("utcOffset")
+      };
+
+      validateDateTimeParts(data, "Tender deadline");
+      return data;
+    }
+
+    function getDeliveryInputs() {
+      const data = {
+        year: parseIntField("deliveryYear"),
+        month: parseIntField("deliveryMonth"),
+        day: parseIntField("deliveryDay"),
+        hour: parseIntField("deliveryHour"),
+        minute: parseIntField("deliveryMinute"),
+        offset: parseIntField("deliveryOffset")
+      };
+
+      validateDateTimeParts(data, "Delivery date");
+      return data;
+    }
+
+    function getInspectionInputs() {
+      const data = {
+        year: parseIntField("inspectionYear"),
+        month: parseIntField("inspectionMonth"),
+        day: parseIntField("inspectionDay"),
+        hour: parseIntField("inspectionHour"),
+        minute: parseIntField("inspectionMinute"),
+        offset: parseIntField("inspectionOffset")
+      };
+
+      validateDateTimeParts(data, "Inspection date");
+      return data;
+    }
+
+    function validateTenderDeadlineNotInPast() {
+      const deadline = getTenderDeadlineInputs();
+      const deadlineUtc = localPartsToUtcDate(
+        deadline.year,
+        deadline.month,
+        deadline.day,
+        deadline.hour,
+        deadline.minute,
+        deadline.offset
+      );
+
+      const now = new Date();
+
+      if (deadlineUtc.getTime() <= now.getTime()) {
+        throw new Error("Tender deadline must be later than the current date and time.");
+      }
+
+      return deadline;
+    }
+
     async function detectWalletRole(currentAccount) {
       if (!contract || !currentAccount) return "Unknown";
       try {
@@ -763,8 +873,10 @@
       }
     }
 
-    async function disconnectWallet() {
+    async function disconnectWallet(showUserToast = true) {
       try {
+        suppressNextDisconnectToast = !showUserToast;
+
         if (window.ethereum?.request) {
           try {
             await window.ethereum.request({
@@ -784,7 +896,10 @@
 
         clearWalletUi();
         log("Wallet disconnected from dApp session.");
-        showToast("Wallet disconnected. Click again to connect a different address.", "info", 5000);
+
+        if (showUserToast) {
+          showToast("Wallet disconnected. Click again to connect a different address.", "info", 5000);
+        }
       } catch (err) {
         const msg = readableError(err);
         log(`Disconnect Wallet failed: ${msg}`);
@@ -800,7 +915,8 @@
         }
 
         if (isConnected && account) {
-          await disconnectWallet();
+          suppressNextAccountsChangedToast = true;
+          await disconnectWallet(true);
           return;
         }
 
@@ -934,19 +1050,27 @@
       $("refreshBtn").addEventListener("click", refreshState);
 
       $("createTenderBtn").addEventListener("click", async () => {
-        await sendTx(() => contract.createTenderWithLocalTime(
-          $("tenderNumber").value,
-          $("tenderTitle").value,
-          $("tenderDescription").value,
-          BigInt($("deadlineYear").value),
-          BigInt($("deadlineMonth").value),
-          BigInt($("deadlineDay").value),
-          BigInt($("deadlineHour").value),
-          BigInt($("deadlineMinute").value),
-          BigInt($("utcOffset").value),
-          ethToWeiBigInt($("contractAmountEth").value),
-          $("qualificationNote").value
-        ), "Create Tender");
+        try {
+          const deadline = validateTenderDeadlineNotInPast();
+
+          await sendTx(() => contract.createTenderWithLocalTime(
+            $("tenderNumber").value,
+            $("tenderTitle").value,
+            $("tenderDescription").value,
+            BigInt(deadline.year),
+            BigInt(deadline.month),
+            BigInt(deadline.day),
+            BigInt(deadline.hour),
+            BigInt(deadline.minute),
+            BigInt(deadline.offset),
+            ethToWeiBigInt($("contractAmountEth").value),
+            $("qualificationNote").value
+          ), "Create Tender");
+        } catch (err) {
+          const msg = readableError(err);
+          log(`Create Tender failed: ${msg}`);
+          showToast(`Create Tender failed: ${msg}`, "error", 6500);
+        }
       });
 
       $("setInspectorBtn").addEventListener("click", async () => {
@@ -997,20 +1121,29 @@
       });
 
       $("deliveryHashBtn").addEventListener("click", async () => {
-        const result = await callView(
-          () => contract.getDeliveryEvidenceHashWithLocalTime(
-            $("deliveryDocType").value,
-            $("deliveryRef").value,
-            BigInt($("deliveryYear").value),
-            BigInt($("deliveryMonth").value),
-            BigInt($("deliveryDay").value),
-            BigInt($("deliveryHour").value),
-            BigInt($("deliveryMinute").value),
-            BigInt($("deliveryOffset").value)
-          ),
-          "Generate Delivery Evidence Hash"
-        );
-        if (result) $("deliveryHash").value = result[1];
+        try {
+          const delivery = getDeliveryInputs();
+
+          const result = await callView(
+            () => contract.getDeliveryEvidenceHashWithLocalTime(
+              $("deliveryDocType").value,
+              $("deliveryRef").value,
+              BigInt(delivery.year),
+              BigInt(delivery.month),
+              BigInt(delivery.day),
+              BigInt(delivery.hour),
+              BigInt(delivery.minute),
+              BigInt(delivery.offset)
+            ),
+            "Generate Delivery Evidence Hash"
+          );
+
+          if (result) $("deliveryHash").value = result[1];
+        } catch (err) {
+          const msg = readableError(err);
+          log(`Generate Delivery Evidence Hash failed: ${msg}`);
+          showToast(`Generate Delivery Evidence Hash failed: ${msg}`, "error", 6500);
+        }
       });
 
       $("submitDeliveryBtn").addEventListener("click", async () => {
@@ -1018,20 +1151,29 @@
       });
 
       $("inspectionHashBtn").addEventListener("click", async () => {
-        const result = await callView(
-          () => contract.getInspectionReportHashWithLocalTime(
-            $("inspectionDocType").value,
-            $("inspectionRef").value,
-            BigInt($("inspectionYear").value),
-            BigInt($("inspectionMonth").value),
-            BigInt($("inspectionDay").value),
-            BigInt($("inspectionHour").value),
-            BigInt($("inspectionMinute").value),
-            BigInt($("inspectionOffset").value)
-          ),
-          "Generate Inspection Report Hash"
-        );
-        if (result) $("inspectionHash").value = result[1];
+        try {
+          const inspection = getInspectionInputs();
+
+          const result = await callView(
+            () => contract.getInspectionReportHashWithLocalTime(
+              $("inspectionDocType").value,
+              $("inspectionRef").value,
+              BigInt(inspection.year),
+              BigInt(inspection.month),
+              BigInt(inspection.day),
+              BigInt(inspection.hour),
+              BigInt(inspection.minute),
+              BigInt(inspection.offset)
+            ),
+            "Generate Inspection Report Hash"
+          );
+
+          if (result) $("inspectionHash").value = result[1];
+        } catch (err) {
+          const msg = readableError(err);
+          log(`Generate Inspection Report Hash failed: ${msg}`);
+          showToast(`Generate Inspection Report Hash failed: ${msg}`, "error", 6500);
+        }
       });
 
       $("acceptDeliveryBtn").addEventListener("click", async () => {
@@ -1064,10 +1206,20 @@
       if (window.ethereum) {
         window.ethereum.on("accountsChanged", async (accounts) => {
           try {
+            if (suppressNextAccountsChangedToast) {
+              suppressNextAccountsChangedToast = false;
+              return;
+            }
+
             if (!accounts || accounts.length === 0) {
-              await disconnectWallet();
+              await disconnectWallet(false);
               log("MetaMask disconnected all accounts.");
-              showToast("All wallet accounts were disconnected.", "info", 5000);
+
+              if (!suppressNextDisconnectToast) {
+                showToast("All wallet accounts were disconnected.", "info", 5000);
+              }
+
+              suppressNextDisconnectToast = false;
               return;
             }
 
