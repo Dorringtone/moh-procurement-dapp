@@ -370,6 +370,11 @@
       <div class="status-grid">
         <div class="stat"><div class="stat-title">Status</div><div class="stat-value" id="statusText">-</div></div>
         <div class="stat"><div class="stat-title">Bidder Count</div><div class="stat-value" id="bidderCount">-</div></div>
+        <div class="stat"><div class="stat-title">Submitted Bids</div><div class="stat-value" id="submittedBids">-</div></div>
+        <div class="stat"><div class="stat-title">Winner</div><div class="stat-value" id="winnerText">-</div></div>
+        <div class="stat"><div class="stat-title">Contract Balance</div><div class="stat-value" id="contractBalance">-</div></div>
+      </div><div class="stat-value" id="statusText">-</div></div>
+        <div class="stat"><div class="stat-title">Bidder Count</div><div class="stat-value" id="bidderCount">-</div></div>
         <div class="stat"><div class="stat-title">Winner</div><div class="stat-value" id="winnerText">-</div></div>
         <div class="stat"><div class="stat-title">Contract Balance</div><div class="stat-value" id="contractBalance">-</div></div>
       </div>
@@ -967,18 +972,20 @@
       try {
         requireConnected();
 
-        const [statusText, bidderCount, winnerData, balanceWei, role] = await Promise.all([
+        const [statusText, bidderCount, winnerData, balanceWei, role, submittedBids] = await Promise.all([
           contract.getCurrentStatusText(),
           contract.getBidderCount(),
           contract.winner(),
           contract.getContractBalance(),
-          detectWalletRole(account)
+          detectWalletRole(account),
+          contract.getBidderCount() // fallback if contract has no direct submitted count
         ]);
 
         $("walletAddress").textContent = shortAddress(account);
         $("walletRole").textContent = role;
         $("statusText").textContent = statusText;
         $("bidderCount").textContent = bidderCount.toString();
+        $("submittedBids").textContent = submittedBids.toString();
         $("winnerText").textContent =
           winnerData[0] === ethers.ZeroAddress
             ? "No winner yet"
