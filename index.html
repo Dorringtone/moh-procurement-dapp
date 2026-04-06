@@ -371,6 +371,7 @@
         <div class="stat"><div class="stat-title">Status</div><div class="stat-value" id="statusText">-</div></div>
         <div class="stat"><div class="stat-title">Bidder Count</div><div class="stat-value" id="bidderCount">-</div></div>
         <div class="stat"><div class="stat-title">Submitted Bids</div><div class="stat-value" id="submittedBids">-</div></div>
+        <div class="stat"><div class="stat-title">Submission Deadline</div><div class="stat-value" id="submissionDeadlineText">-</div></div>
         <div class="stat"><div class="stat-title">Winner</div><div class="stat-value" id="winnerText">-</div></div>
         <div class="stat"><div class="stat-title">Contract Balance</div><div class="stat-value" id="contractBalance">-</div></div>
       </div>
@@ -563,6 +564,7 @@
         <button class="btn-secondary" id="readBiddersBtn">Read Registered Bidders</button>
         <button class="btn-secondary" id="readWinnerBtn">Read Winner</button>
         <button class="btn-secondary" id="readBalanceBtn">Read Contract Balance</button>
+        <button class="btn-secondary" id="readAllBidDetailsBtn">Read Bid Details</button>
 
         <div class="footer-note">
           Tip: Connect your wallet and use the buttons above to view on-chain data such as the tender summary, registered bidders, winner, and contract balance.
@@ -577,7 +579,7 @@
   </div>
 
   <script>
-    const CONTRACT_ADDRESS = "0x50Ef4C51ACf00cb6051F4d08687A507DecAe0E86";
+    const CONTRACT_ADDRESS = "0xbffb651c98b192c950c9Ece086bf9ef67f7B474E";
 
     const ABI = [
       "function admin() view returns (address)",
@@ -601,6 +603,8 @@
       "function releasePayment()",
       "function getCurrentStatusText() view returns (string)",
       "function getBidderCount() view returns (uint256)",
+      "function getSubmittedBidCount() view returns (uint256)",
+      "function getAllBidDetails() view returns (uint256[],address[],string[],bool[],bool[],uint256[],bool[],bytes32[])",
       "function getSubmittedBidCount() view returns (uint256)",
       "function winner() view returns (address,string)",
       "function getContractBalance() view returns (uint256)",
@@ -737,6 +741,7 @@
       $("statusText").textContent = "-";
       $("bidderCount").textContent = "-";
       $("submittedBids").textContent = "-";
+      $("submissionDeadlineText").textContent = "-";
       $("winnerText").textContent = "-";
       $("contractBalance").textContent = "-";
       setConnectedUi(false);
@@ -970,13 +975,14 @@
       try {
         requireConnected();
 
-        const [statusText, bidderCount, submittedBids, winnerData, balanceWei, role] = await Promise.all([
+        const [statusText, bidderCount, submittedBids, winnerData, balanceWei, role, tenderSummary] = await Promise.all([
           contract.getCurrentStatusText(),
           contract.getBidderCount(),
           contract.getSubmittedBidCount(),
           contract.winner(),
           contract.getContractBalance(),
-          detectWalletRole(account)
+          detectWalletRole(account),
+          contract.getTenderSummary()
         ]);
 
         $("walletAddress").textContent = shortAddress(account);
@@ -984,6 +990,10 @@
         $("statusText").textContent = statusText;
         $("bidderCount").textContent = bidderCount.toString();
         $("submittedBids").textContent = submittedBids.toString();
+        const deadlineTimestamp = Number(tenderSummary[3]);
+        $("submissionDeadlineText").textContent = deadlineTimestamp > 0
+          ? new Date(deadlineTimestamp * 1000).toLocaleString()
+          : "-";
         $("winnerText").textContent =
           winnerData[0] === ethers.ZeroAddress
             ? "No winner yet"
@@ -1206,6 +1216,10 @@
         if (result !== undefined) {
           log(`Contract balance in ETH: ${ethers.formatEther(result)}`);
         }
+      });
+
+      $("readAllBidDetailsBtn").addEventListener("click", async () => {
+        await callView(() => contract.getAllBidDetails(), "Read Bid Details");
       });
 
       if (window.ethereum) {
