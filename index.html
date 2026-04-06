@@ -373,10 +373,6 @@
         <div class="stat"><div class="stat-title">Submitted Bids</div><div class="stat-value" id="submittedBids">-</div></div>
         <div class="stat"><div class="stat-title">Winner</div><div class="stat-value" id="winnerText">-</div></div>
         <div class="stat"><div class="stat-title">Contract Balance</div><div class="stat-value" id="contractBalance">-</div></div>
-      </div><div class="stat-value" id="statusText">-</div></div>
-        <div class="stat"><div class="stat-title">Bidder Count</div><div class="stat-value" id="bidderCount">-</div></div>
-        <div class="stat"><div class="stat-title">Winner</div><div class="stat-value" id="winnerText">-</div></div>
-        <div class="stat"><div class="stat-title">Contract Balance</div><div class="stat-value" id="contractBalance">-</div></div>
       </div>
     </section>
 
@@ -605,6 +601,7 @@
       "function releasePayment()",
       "function getCurrentStatusText() view returns (string)",
       "function getBidderCount() view returns (uint256)",
+      "function getSubmittedBidCount() view returns (uint256)",
       "function winner() view returns (address,string)",
       "function getContractBalance() view returns (uint256)",
       "function getTenderSummary() view returns (string,string,string,uint256,uint256,string,uint8,string,address,string,uint256)",
@@ -739,6 +736,7 @@
       $("networkName").textContent = "Unknown";
       $("statusText").textContent = "-";
       $("bidderCount").textContent = "-";
+      $("submittedBids").textContent = "-";
       $("winnerText").textContent = "-";
       $("contractBalance").textContent = "-";
       setConnectedUi(false);
@@ -972,13 +970,13 @@
       try {
         requireConnected();
 
-        const [statusText, bidderCount, winnerData, balanceWei, role, submittedBids] = await Promise.all([
+        const [statusText, bidderCount, submittedBids, winnerData, balanceWei, role] = await Promise.all([
           contract.getCurrentStatusText(),
           contract.getBidderCount(),
+          contract.getSubmittedBidCount(),
           contract.winner(),
           contract.getContractBalance(),
-          detectWalletRole(account),
-          contract.getBidderCount() // fallback if contract has no direct submitted count
+          detectWalletRole(account)
         ]);
 
         $("walletAddress").textContent = shortAddress(account);
