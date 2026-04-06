@@ -567,7 +567,13 @@
         <button class="btn-secondary" id="readAllBidDetailsBtn">Read Bid Details</button>
 
         <div class="footer-note">
-          Tip: Connect your wallet and use the buttons above to view on-chain data such as the tender summary, registered bidders, winner, and contract balance.
+          Tip: Connect your wallet and use the buttons above to view on-chain data such as the tender summary, registered bidders, winner, contract balance, and bid details.
+        </div>
+
+        <div id="readOutputPanel" class="time-panel" style="margin-top:18px;">
+          <div class="time-panel-title">Read Output</div>
+          <div class="time-panel-subtitle">The selected read function output will appear here in a structured, human-readable format.</div>
+          <div id="readOutputContent" class="muted">No read function output yet.</div>
         </div>
       </div>
 
@@ -761,6 +767,90 @@
     function ethToWeiBigInt(value) {
       const normalized = (value || "0").toString().trim();
       return ethers.parseEther(normalized);
+    }
+
+    function formatEth(value) {
+      try {
+        return `${ethers.formatEther(value)} ETH`;
+      } catch {
+        return String(value);
+      }
+    }
+
+    function formatTimestamp(timestamp) {
+      const ts = Number(timestamp);
+      if (!ts || ts <= 0) return "-";
+      return new Date(ts * 1000).toLocaleString("en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function setReadOutput(title, fields) {
+      const container = $("readOutputContent");
+      if (!container) return;
+
+      if (!fields || !fields.length) {
+        container.innerHTML = `<div class="muted">No data available for ${escapeHtml(title)}.</div>`;
+        return;
+      }
+
+      const rows = fields.map(({ label, value }) => `
+        <div class="stat" style="margin-top:10px;">
+          <div class="stat-title">${escapeHtml(label)}</div>
+          <div class="stat-value">${escapeHtml(value)}</div>
+        </div>
+      `).join("");
+
+      container.innerHTML = `
+        <div class="time-panel-title" style="margin-bottom:10px;">${escapeHtml(title)}</div>
+        ${rows}
+      `;
+    }
+
+    function setReadOutputTable(title, columns, rows) {
+      const container = $("readOutputContent");
+      if (!container) return;
+
+      if (!rows || !rows.length) {
+        container.innerHTML = `<div class="muted">No data available for ${escapeHtml(title)}.</div>`;
+        return;
+      }
+
+      const headerHtml = columns.map(col => `<th style="text-align:left; padding:10px; border-bottom:1px solid var(--border);">${escapeHtml(col)}</th>`).join("");
+      const bodyHtml = rows.map(row => `
+        <tr>
+          ${row.map(cell => `<td style="padding:10px; border-bottom:1px solid var(--border); vertical-align:top;">${escapeHtml(cell)}</td>`).join("")}
+        </tr>
+      `).join("");
+
+      container.innerHTML = `
+        <div class="time-panel-title" style="margin-bottom:10px;">${escapeHtml(title)}</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden;">
+            <thead style="background:#f8fafc;">
+              <tr>${headerHtml}</tr>
+            </thead>
+            <tbody>
+              ${bodyHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
     }
 
     function parseIntField(id) {
@@ -1209,26 +1299,81 @@
       });
 
       $("readSummaryBtn").addEventListener("click", async () => {
-        await callView(() => contract.getTenderSummary(), "Read Tender Summary");
+        const result = await callView(() => contract.getTenderSummary(), "Read Tender Summary");
+        if (result) {
+          setReadOutput("Tender Summary", [
+            { label: "Tender Number", value: result[0] || "-" },
+            { label: "Title", value: result[1] || "-" },
+            { label: "Description", value: result[2] || "-" },
+            { label: "Submission Deadline", value: formatTimestamp(result[3]) },
+            { label: "Contract Amount", value: formatEth(result[4]) },
+            { label: "Qualification Note", value: result[5] || "-" },
+            { label: "Current Status", value: result[7] || "-" },
+            { label: "Current Winner Address", value: result[8] || "-" },
+            { label: "Current Winner Description", value: result[9] || "-" },
+            { label: "Winning Bid", value: formatEth(result[10]) }
+          ]);
+        }
       });
 
       $("readBiddersBtn").addEventListener("click", async () => {
-        await callView(() => contract.getAllRegisteredBidders(), "Read Registered Bidders");
+        const result = await callView(() => contract.getAllRegisteredBidders(), "Read Registered Bidders");
+        if (result) {
+          const rows = (result[0] || []).map((_, i) => [
+            String(result[0][i]),
+            String(result[1][i] || "-"),
+            String(result[2][i] || "-")
+          ]);
+          setReadOutputTable("Registered Bidders", ["#", "Bidder Address", "Description"], rows);
+        }
       });
 
       $("readWinnerBtn").addEventListener("click", async () => {
-        await callView(() => contract.winner(), "Read Winner");
+        const result = await callView(() => contract.winner(), "Read Winner");
+        if (result) {
+          setReadOutput("Winner", [
+            { label: "Winner Address", value: result[0] || "-" },
+            { label: "Winner Description", value: result[1] || "-" }
+          ]);
+        }
       });
 
       $("readBalanceBtn").addEventListener("click", async () => {
         const result = await callView(() => contract.getContractBalance(), "Read Contract Balance");
         if (result !== undefined) {
           log(`Contract balance in ETH: ${ethers.formatEther(result)}`);
+          setReadOutput("Contract Balance", [
+            { label: "Balance", value: formatEth(result) }
+          ]);
         }
       });
 
       $("readAllBidDetailsBtn").addEventListener("click", async () => {
-        await callView(() => contract.getAllBidDetails(), "Read Bid Details");
+        const result = await callView(() => contract.getAllBidDetails(), "Read Bid Details");
+        if (result) {
+          const rows = (result[0] || []).map((_, i) => {
+            const submitted = Boolean(result[3][i]);
+            const revealed = Boolean(result[4][i]);
+            const amount = result[5][i];
+            const valid = Boolean(result[6][i]);
+            const hash = result[7][i];
+            const displayValue = revealed ? formatEth(amount) : String(hash || "-");
+            return [
+              String(result[0][i]),
+              String(result[1][i] || "-"),
+              String(result[2][i] || "-"),
+              submitted ? "Yes" : "No",
+              revealed ? "Yes" : "No",
+              valid ? "Yes" : "No",
+              displayValue
+            ];
+          });
+          setReadOutputTable(
+            "Bid Details",
+            ["#", "Bidder Address", "Description", "Submitted", "Revealed", "Valid", "Amount / Sealed Hash"],
+            rows
+          );
+        }
       });
 
       if (window.ethereum) {
