@@ -991,8 +991,17 @@
         $("bidderCount").textContent = bidderCount.toString();
         $("submittedBids").textContent = submittedBids.toString();
         const deadlineTimestamp = Number(tenderSummary[3]);
+        const offset = parseInt(document.getElementById("utcOffset")?.value || "0", 10);
+        const offsetLabel = `UTC${offset >= 0 ? "+" + offset : offset}`;
         $("submissionDeadlineText").textContent = deadlineTimestamp > 0
-          ? new Date(deadlineTimestamp * 1000).toLocaleString()
+          ? `${new Date(deadlineTimestamp * 1000).toLocaleString('en-GB', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            })} (${offsetLabel})`
           : "-";
         $("winnerText").textContent =
           winnerData[0] === ethers.ZeroAddress
