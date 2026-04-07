@@ -47,20 +47,25 @@ It enhances transparency, auditability, and fairness in public procurement.
 ---
 ## 🔗 Links
 
-### 🎥 Demo Video
+🧾 **Smart Contract Address (Sepolia Network)**
+0xbffb651c98b192c950c9Ece086bf9ef67f7B474E
 
-https://drive.google.com/file/d/1EB0JPFDUTQqUYlMu63gNiXIQ7-q5XRjG/view?usp=sharing
-
-### 🌐 Frontend (dApp Interface)
-
-https://dorringtone.github.io/moh-procurement-dapp/
-
-### 📜 Smart Contract (Sepolia Etherscan)
-
+🧾 **Blockchain Explorer (Sepolia Etherscan)**
 https://sepolia.etherscan.io/address/0xbffb651c98b192c950c9Ece086bf9ef67f7B474E
 
-### 💻 Smart Contract Source Code
+🎥 **Demo Video**
+https://drive.google.com/file/d/1EB0JPFDUTQqUYlMu63gNiXIQ7-q5XRjG/view?usp=sharing
 
+💻 **GitHub Repository (Full Project Codebase)**
+https://github.com/Dorringtone/moh-procurement-dapp
+
+🌐 **Frontend (dApp Interface)**
+https://dorringtone.github.io/moh-procurement-dapp/
+
+🖥️ **Frontend Source Code (Web dApp Interface)**
+https://github.com/Dorringtone/moh-procurement-dapp/blob/main/index.html
+
+📄 **Smart Contract Source Code**
 https://github.com/Dorringtone/moh-procurement-dapp/blob/main/contracts/KenyaProcurementTransparency.sol
 
 ---
