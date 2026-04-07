@@ -92,4 +92,4 @@ https://github.com/Dorringtone/moh-procurement-dapp/blob/main/contracts/KenyaPro
 
 ## 📄 License
 
-MIT License
+EBU License
