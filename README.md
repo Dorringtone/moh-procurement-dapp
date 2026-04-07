@@ -33,13 +33,13 @@ It enhances transparency, auditability, and fairness in public procurement.
 ## 📸 Screenshots
 
 ### UI Overview
-![UI](screenshots/UI.png)
+![UI](UI.png)
 
 ### Transactions
-![Transactions](screenshots/Transactions.png)
+![Transactions](Transactions.png)
 
 ### Activity Log
-![Activity](screenshots/Activity%20Log.png)
+![Activity](Activity%20Log.png)
 
 ---
 ## 🔗 Links
