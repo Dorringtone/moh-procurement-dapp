@@ -32,6 +32,9 @@ It enhances transparency, auditability, and fairness in public procurement.
 
 ## 📸 Screenshots
 
+### Disgramatic Representation of the System
+![System Diagram](Diagrammatic%20representation%20of%20procurement%20process.png)
+
 ### UI Overview
 ![UI](UI.png)
 
