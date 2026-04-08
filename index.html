@@ -1264,6 +1264,7 @@
 
       $("submitSealedBidBtn").addEventListener("click", async () => {
         await sendTx(() => contract.submitSealedBid($("sealedBidHash").value), "Submit Sealed Bid");
+        $("sealedBidHash").value = "";
       });
 
       $("revealBidBtn").addEventListener("click", async () => {
@@ -1298,6 +1299,7 @@
 
       $("submitDeliveryBtn").addEventListener("click", async () => {
         await sendTx(() => contract.submitDeliveryEvidence($("deliveryHash").value), "Submit Delivery Evidence");
+        $("deliveryHash").value = "";
       });
 
       $("inspectionHashBtn").addEventListener("click", async () => {
@@ -1328,6 +1330,7 @@
 
       $("acceptDeliveryBtn").addEventListener("click", async () => {
         await sendTx(() => contract.acceptDelivery($("inspectionHash").value), "Accept Delivery");
+        $("inspectionHash").value = "";
       });
 
       $("rejectDeliveryBtn").addEventListener("click", async () => {
